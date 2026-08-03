@@ -1,6 +1,10 @@
-figures/
-__pycache__/
-*.pyc
-.pytest_cache/
-build/
+﻿__pycache__/
+*.py[cod]
 *.egg-info/
+.pytest_cache/
+.venv/
+venv/
+.DS_Store
+.idea/
+.vscode/
+build/
