@@ -128,7 +128,7 @@ shortfall is entirely the eq.-38 depth estimator, not the overlap formula:
 | 800 | 0.7166 | 2.8483 | 0.9629     | 0.9905      | 0.9537 |
 
 Given the *true* depth, eq. 24 recovers `s` almost exactly (0.963 → **0.9905** at
-ρ=800). The eq.-38 estimate `τ̂_c` is ~4 % too short (ratio 0.960 → 0.963, rising
+ρ=800). The eq.-38 estimate `τ_c` is ~4 % too short (ratio 0.960 → 0.963, rising
 with ρ), and since `d ∝ τ_c` this maps linearly onto the ~4 % low distance. The
 depth deficit is the **same** `L/√N < 2` finite-size chain shortfall validated in
 Phase 1 (entering here through the chain-count `n_C`), vanishing as `N^(−1/3)`.
