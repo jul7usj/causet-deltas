@@ -214,7 +214,8 @@ Primary: `m₃ = 2.3427 ± 0.0975 (stat) ± 0.0180 (syst) = 2.3427 ± 0.0991`,
 which is **0.35 σ** outside `[2.278, 2.308]` ⇒ consistent.
 
 **This is consistency, not confirmation.** The error bar is 8× wider than
-Rideout–Wallden's ±0.012; with ±0.099 anything in ≈[2.14, 2.54] would have "passed".
+Rideout–Wallden's ±0.012; at ±0.099 the 2σ criterion would have accepted any central
+value in ≈[2.08, 2.51], so this gate could not have detected a several-percent error.
 Spread across fit variants, which exceeds every individual quoted error:
 
 | fit variant | m₃ | note |
