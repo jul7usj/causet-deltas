@@ -227,9 +227,27 @@ Spread across fit variants, which exceeds every individual quoted error:
 | **Rideout–Wallden published** | **2.2960 ± 0.0120** | |
 
 **All four of our estimates lie at or above 2.296** (2.303, 2.328, 2.343, 2.472); none
-below. Logged as an observation, not a claim — ±0.099 cannot support it. The
-method-to-method spread (~0.04 among the defensible variants) is the real uncertainty
-on any such extrapolation, including the published one.
+below.
+
+**That one-sidedness is the effective-fit overshoot, not physics.** Unmodelled
+higher-order corrections bias the *fitted* exponent shallow relative to the true
+asymptotic one (here −0.166 vs RW's −0.173; in the d=2 controls −0.2616 and −0.3216
+against the exact −1/3), and since `m_∞ = m(N_max) + |a|·N_max^c`, a shallower `c`
+mechanically inflates the extrapolated constant. The four variants are monotone in
+exactly that way — `c = −0.091 → 2.472`, `c = −0.166 → 2.343`, `c = −0.173 → 2.328`,
+`c` and `a` both pinned `→ 2.304` — so the ordering is a property of how much
+extrapolation freedom each fit retains, not of the geometry. Its magnitude is measured
+independently rather than argued: the identical procedure over the identical N window
+overshoots the *exactly known* `m₂ = 2` by **+0.018** (Control B), falling to
+**+0.0019** once the window improves (Control C), and the d=2 exponent bias shrinks in
+step (0.072 → 0.012 shallow). Subtracting Control B's overshoot from our primary
+estimate gives **2.325 ± 0.098**, statistically indistinguishable from 2.296. So the
+clustering above the published value is expected from the fitting procedure and
+carries no evidence for a larger m₃; logged as an observation, not a claim — ±0.099
+could not support one either way.
+
+The method-to-method spread (~0.04 among the defensible variants) is the real
+uncertainty on any such extrapolation, including the published one.
 
 ### Finding 3 — the link convention contributes an exactly known power of N
 
