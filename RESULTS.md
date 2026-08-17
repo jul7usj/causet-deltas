@@ -319,3 +319,193 @@ not route through BLAS, making them O(N³) in practice (~32 s at N≈1600). They
 correct and reused unchanged (re-exported, with a regression test asserting function
 identity and identical 1+1 D results), but Part 2's `future_2links` must not be built
 on them at scale.
+
+---
+
+## 2026-08-17 — Phase 2b Part 2 GATE A: Rideout–Wallden 2-link spacelike distance (2+1 D)
+
+- **Branch:** `phase2b-2d1` (Part 1 accepted at `41f5607`)
+- **Module:** `src/causet/rideout_wallden.py`
+- **Experiment:** `experiments/exp03_2link_stability.py`
+- **Figure:** `figures/exp03_2link_stability.png` (regenerable from the cache)
+- **Data:** `data/exp03_measurements.npz` (raw per-realisation values)
+- **Seeds:** `SEED_BASE = 20260817`; realisation seed = `SEED_BASE + 10000·i + k`
+- **Tests:** `python -m pytest` → **96 passed** (26 new; the 70 Part-1 tests unchanged)
+
+### Parameters
+- 2+1 D box `[0,T]×[−Lx/2,Lx/2]×[−Ly/2,Ly/2]`, extents `λ·(4.0, 2.5, 5.0)·D`,
+  `λ ∈ {0.55, 0.70, 0.85, 1.00, 1.15, 1.30, 1.45}` — shape held **fixed**, only `λ` varies.
+- Target pair fixed at `x=(T/2, −D/2, 0)`, `y=(T/2, +D/2, 0)` with `D = 1` (true
+  separation), appended to the sprinkling; density fixed at `ρ = 60`.
+- **40 realisations per region size**, 7 sizes = 280 causets. Volume 8.32 → 152.43
+  (factor **18.3**), `⟨N⟩` 495 → 9148.
+- Calibration: eqs. (1)–(2), `l = L/(m₃(ρη(3))^{1/3})`, `m₃ = 2.296`, `η(3) = π/12`.
+  **Link convention throughout** (Part-1 Constraint 1), isolated in
+  `order3d.chain_links_from_elements`.
+- Region shape is elongated in `t` and `y`, narrow in `x`, because the light cones of
+  this pair meet on `X = 0, t = ±√(D²/4 + Y²)`. That shape buys the boost freedom the
+  construction needs per element sprinkled; holding it fixed means it cannot
+  manufacture or hide a trend.
+
+### Finding 1 — GATE A **PASSES**: the 2-link distance does not drift
+
+| λ | V | ⟨N⟩ | 2-links/causet | total | empty | **d_2link** | SE | n≠0 | d_naive | SE | ⟨L⟩ | ⟨\|[p,f]\|⟩ | pairs |
+|------|--------|------|------|-----|----|------------|--------|----|--------|--------|------|------|------|
+| 0.55 | 8.32   | 495  | 0.62 | 25  | 23 | 0.8712 | 0.0339 | 17 | 0.8174 | 0.0178 | 5.01 | 36.8 | 148  |
+| 0.70 | 17.15  | 1039 | 1.20 | 48  | 11 | 0.8630 | 0.0229 | 29 | 0.8391 | 0.0196 | 4.96 | 36.7 | 554  |
+| 0.85 | 30.71  | 1848 | 1.07 | 43  | 15 | 0.9287 | 0.0231 | 25 | 0.8174 | 0.0167 | 5.34 | 42.7 | 1099 |
+| 1.00 | 50.00  | 3010 | 1.05 | 42  | 16 | 0.8635 | 0.0283 | 24 | 0.7913 | 0.0186 | 4.97 | 35.4 | 1671 |
+| 1.15 | 76.04  | 4554 | 1.18 | 47  | 13 | 0.8754 | 0.0210 | 27 | 0.7913 | 0.0164 | 5.03 | 39.0 | 2276 |
+| 1.30 | 109.85 | 6601 | 1.52 | 61  | 11 | 0.8717 | 0.0201 | 29 | 0.8043 | 0.0149 | 5.01 | 36.3 | 3601 |
+| 1.45 | 152.43 | 9148 | 1.50 | 60  | 12 | 0.8731 | 0.0235 | 28 | 0.8043 | 0.0149 | 5.02 | 38.0 | 4226 |
+
+Errors are standard errors **across realisations**, not across pooled 2-links: the
+2-links inside one causet share a sprinkling and a target pair, so pooling them and
+dividing by `√total` would understate the error. The primary statistic is the
+per-realisation Step-5 mean; `n≠0` is how many causets contributed.
+
+Weighted straight-line fit against `log₂V`:
+
+    slope = −0.00218 ± 0.00707 per log₂V     (0.31 σ from zero),  χ²/dof = 5.59/5
+
+i.e. a total change of **−0.009 ± 0.030** across a factor 18.3 in volume, on a value
+of ≈0.87. Both acceptance criteria, fixed before the verdict:
+
+- **A1 stability** — `|slope| ≤ 2σ`: **pass** (0.31 σ).
+- **A2 resolution** — `σ_slope ≤ 0.0238`, so that a degradation of 20% of `D` across
+  the ladder (slope 0.0476) would have been a ≥2σ detection: **pass**, and in fact
+  such a drift would have shown at **6.7 σ**. Without A2 the gate would be passable
+  by simply having wide error bars (Part-2 Constraint 3).
+
+### Finding 2 — the naive control did **not** visibly fail (reported as prominently as the pass)
+
+Rideout–Wallden motivate the whole 2-link construction by the claim that the naive
+double minimum of their Section II.B degrades for spacetime dimension `d ≥ 3`, because
+boosts supply an unbounded family of minimising pairs and the minimum over ever more
+samples drifts downward. Measured on the **same** sprinklings, same target pair, same
+calibration:
+
+    naive slope = −0.00643 ± 0.00457 per log₂V   (1.41 σ),  total −0.027 ± 0.019
+
+The trend is in the predicted direction and about **3× the magnitude** of the 2-link
+slope — but at 1.4 σ it is **not resolved**. Sharper still: the number of `(p,f)`
+candidate pairs the naive minimum ranges over grew from 148 to 4226, a factor **29**,
+and 29× more chances to fluctuate low bought a decrease of at most 3%.
+
+So this experiment does **not** reproduce a visible failure of the naive estimator at
+reachable region sizes. Two readings are consistent with the data and it cannot
+separate them: the drift may be real but logarithmically slow (which would match
+Finding 3's mechanism), or the factor-18 range may simply be too short. Either way,
+**Gate A's pass rests on the 2-link estimator's own flatness plus criterion A2, not on
+a demonstrated contrast with the naive one.** The contrast remains an untested premise
+of the source paper as far as this work is concerned.
+
+(`naive_distance` uses the exact maximal-past × minimal-future reduction, which is
+provably identical to minimising over the full common past and future — not an
+approximation, and asserted against a brute-force scan in the tests.)
+
+### Finding 3 — the 2-link sample size grows only **logarithmically** with the region
+
+Rideout–Wallden state that infinite Minkowski contains infinitely many `n`-links when
+`n < d` (here 2 < 3), but say nothing about the rate — and the rate is what decides
+whether the estimator is usable. Fitting two falsifiable models to the same points:
+
+    yield = 0.306 ± 0.019 · ln V        χ²/dof = 5.86/6 = 0.98    <- describes the data
+    yield = 0.01457 · V                 χ²/dof = 73.3/6 = 12.2    <- decisively rejected
+
+Consequences, all measured:
+
+- **326 2-links over 280 causets = 1.16 per causet.** The Step-5 "average over all
+  `f_i`" is, in practice, an average over **one** sample.
+- **101/280 causets (36%) yielded no 2-link at all**, and the estimator returns nothing
+  on those. At the smallest region it was 23/40 (58%).
+- A factor **18** in volume bought a factor **2.4** in 2-links. Because the growth is
+  logarithmic, doubling the yield again requires **squaring** the volume
+  (152 → 23 235, i.e. `N ~ 1.4×10⁶` elements) — far beyond the O(N²) dense causal
+  matrix used here, and beyond any obvious sparse rewrite.
+
+This is consistent with the paper's existence claim and with the flatness in Finding 1,
+but it is the binding practical limit on the estimator as a Δs benchmark in Phase 4.
+
+### Finding 4 — a −12% scale offset, only partly explained by the finite-size calibration
+
+Grand mean **0.878** against the true `D = 1` (ratio 0.878). The direction is expected:
+Step 2 deliberately picks the *smallest* interval available (mean size **37.9
+elements**), while eq. (1) is a `ρV → ∞` statement. Evaluating Rideout–Wallden's own
+Fig.-4 curve at 37.9 gives `m₃^eff = 1.717`, which on its own predicts lengths low by a
+factor **0.748**.
+
+**The observed 0.878 is well above that 0.748, so the finite-size calibration
+over-predicts the shortfall** — something compensates, and this work has not pinned it
+down. The plausible candidate, flagged as unverified: the minimising interval is not a
+typical Alexandrov interval of the sprinkling but one conditioned on `p` being maximal
+in the common past and `f` being a 2-link, which selects intervals *emptier* than
+typical for their proper time; the appropriate `ρV` at which to read `m₃^eff` would
+then be larger than the realised count of 37.9, pushing the predicted ratio up. Logged
+as an open discrepancy, not a claim.
+
+The offset does not affect the gate: at fixed density it is a constant multiplier that
+shifts every point equally and so cannot create or mask a slope. It **will** matter in
+Part B, where the two estimators carry different calibration conventions (`m₃` vs
+`c_d`) — which is why that comparison is specified on rank ordering, not scale.
+
+**Resolution floor.** One chain link is `0.174` in length units, **17% of `D`**, and
+`⟨L⟩ ≈ 5.0` throughout. There is also a hard floor of **2 links**: every minimising
+interval `[p,f]` contains both `x` and `y` (since `p ≺ x ≺ f`), so its longest chain has
+at least 3 elements. The estimator is coarsely quantised (figure, panel C) and cannot
+report a distance below `2/(m₃(ρη)^{1/3})`.
+
+### Finding 5 — the 2-link condition is strictly stronger than minimality, and it is guarded
+
+`future_2links` implements Definition 2b (`n = 2`) literally: `f` in the common future
+with **both** intervals `[x,f]` and `[y,f]` empty. Every 2-link is minimal in
+`fut(x)∩fut(y)` (a common-future element below `f` would sit inside `[x,f]`), so the
+2-links are a subset of the minimal elements — and a **strict** one, because minimality
+cannot see an intervening `z` with `x ≺ z ≺ f` that misses `fut(y)`. That is the exact
+failure Rideout–Wallden warn about in Section V.A, where it lets the Step-2 minimising
+pair have arbitrarily large proper time.
+
+A 13-element hand-placed M³ causet pins this down (`tests/test_rideout_wallden.py`).
+It contains two deliberate negative controls, `fbad_x` and `fbad_y`, each **minimal in
+the common future** yet blocked from one target by an element lying in only that
+target's future. The test asserts `minimal = {f0, f2, fbad_x, fbad_y}` while
+`2-links = {f0, f2}` — an implementation using minimal elements fails on both. Every
+causal relation the test depends on is asserted individually, and each set was verified
+against the hand derivation before being written down.
+
+An exact reduction, proved rather than assumed: if `p ≺ p′` are both in the common past,
+any chain from `p′` extends by `p`, so `d(p,f) > d(p′,f)` and only **maximal**
+common-past elements can minimise Step 2. This matters because `|past(x)∩past(y)|` grows
+with the region while the minimising intervals do not. `exhaustive_past=True` disables
+it and the tests assert the two agree on the hand causet and on random sprinklings.
+
+### Interpretation (honest)
+
+**Gate A passes, and passes on a criterion strong enough to have failed.** The
+Rideout–Wallden 2-link distance holds to −0.009 ± 0.030 across a factor 18.3 in
+sprinkling volume around a fixed pair at fixed density, with error bars tight enough
+that a 20%-of-`D` degradation would have registered at 6.7 σ. That is the property the
+construction exists to provide, and it is confirmed.
+
+Two things temper it. First, the comparison that was supposed to make the result
+*meaningful* — the naive estimator visibly degrading on the same data — **did not
+materialise** (Finding 2); the pass therefore establishes that the 2-link distance is
+stable, not that it is stable *where the naive one is not*. Second, and more
+consequential for Phase 4: the estimator's own sample size grows like `ln V`
+(Finding 3), so it delivers ~1 measurement per causet and returns nothing at all 36% of
+the time. Combined with a 17%-of-`D` quantum and a −12% scale offset that the
+finite-size calibration only partly accounts for (Finding 4), the 2-link distance is
+**stable but low-yield and low-resolution** — a sound benchmark for rank ordering and
+for trend tests, and a poor one for any comparison demanding per-causet accuracy.
+
+### Practical note for Part B
+
+- Cost is dominated by the naive control (6.5 s/realisation at `N ≈ 9150`) and by
+  `causal_matrix_3d`, whose dense `N×N` float temporaries make `N ≳ 12 000` infeasible
+  in memory. The 2-link distance itself is cheap (0.11 s at that size).
+- `chain_links_to_target` replaced a per-`(p,f)` interval DP and cut the control from
+  21 s to 6.5 s; it is exact, and `chain_links_between` survives as the per-pair oracle
+  the tests check it against.
+- Head-to-head pairs must be chosen with the 17%-of-`D` quantum in mind: separations
+  closer together than ~1 link cannot be rank-ordered by this estimator at `ρ = 60`,
+  so the ≥20 pairs should span a wide range of true separations.
