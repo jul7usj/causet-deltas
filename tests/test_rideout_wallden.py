@@ -212,6 +212,42 @@ def test_two_link_distance_hand_built(hand_causet):
     assert res.n_past_candidates == 2 and res.n_past_scanned == 1
 
 
+def test_two_link_distance_reports_the_selected_pair(hand_causet):
+    """The ``(p, f_i)`` pairs are exposed, and they reproduce the reported values.
+
+    Needed by the offset diagnostic: only the coordinates of the selected pair
+    can separate a calibration bias from a geometric one.
+    """
+    x, y, c = IDX["x"], IDX["y"], hand_causet
+    res = rw.two_link_distance(x, y, c)
+    assert names_of(res.per_link_future) == {"f0", "f2"}
+    assert names_of(res.per_link_past) == {"p0"}  # the sole maximal common past
+    for p, f, links in zip(
+        res.per_link_past, res.per_link_future, res.per_link_chain_links
+    ):
+        assert rw.chain_links_between(int(p), int(f), c) == int(links)
+
+
+def test_selected_pair_reproduces_the_reported_links_on_sprinklings(random_causets):
+    """Same check on real causets: the recorded pair *is* the reported minimum."""
+    rng = np.random.default_rng(31)
+    checked = 0
+    for c in random_causets:
+        for x, y in spacelike_pairs(c, rng, 6):
+            res = rw.two_link_distance(x, y, c)
+            assert res.per_link_past.size == res.n_two_links
+            assert res.per_link_future.size == res.n_two_links
+            for p, f, links in zip(
+                res.per_link_past, res.per_link_future, res.per_link_chain_links
+            ):
+                assert rw.chain_links_between(int(p), int(f), c) == int(links)
+                # and it really is minimal over the whole common past
+                whole = np.flatnonzero(c[:, x] & c[:, y])
+                assert int(links) == int(rw.chain_links_to_target(int(f), whole, c).min())
+                checked += 1
+    assert checked > 0
+
+
 def test_two_link_distance_maximal_past_reduction_is_exact(hand_causet):
     """Scanning only maximal common-past elements must not change the answer."""
     x, y, c = IDX["x"], IDX["y"], hand_causet

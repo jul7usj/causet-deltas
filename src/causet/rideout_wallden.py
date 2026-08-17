@@ -400,6 +400,15 @@ class TwoLinkDistanceResult:
         Element count of each minimising interval ``[p, f_i]`` (endpoints
         excluded). Diagnoses the asymptotic-calibration caveat: eq. (1) is being
         applied at *these* interval sizes.
+    per_link_future, per_link_past:
+        Indices of the 2-link ``f_i`` and of the ``p`` that minimised Step 2 for
+        it. Exposed because the *geometry* of the selected pair is the only way
+        to separate a calibration bias from a geometric one: the estimator
+        reports ``d(p, f_i)``, which is bounded below by the true spacelike
+        distance but need not equal it, and the two can only be told apart by
+        looking up the coordinates of these elements.
+        (Ties are broken by the first minimiser in index order; the reported
+        value is unaffected.)
     n_past_candidates, n_past_scanned:
         Size of ``past(x) n past(y)`` and the number of its elements actually
         scanned in Step 2 (equal when ``exhaustive_past=True``; otherwise the
@@ -414,6 +423,8 @@ class TwoLinkDistanceResult:
     per_link_distance: np.ndarray = field(default_factory=lambda: np.empty(0))
     per_link_chain_links: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=int))
     per_link_interval_size: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=int))
+    per_link_future: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=int))
+    per_link_past: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=int))
     n_past_candidates: int = 0
     n_past_scanned: int = 0
 
@@ -490,6 +501,7 @@ def two_link_distance(
 
     dists_links: list[int] = []
     interval_sizes: list[int] = []
+    chosen_past: list[int] = []
     if scan.size:
         for f in links_f.tolist():
             # Step 2: minimise d(p, f) over the common past. Every p there
@@ -500,6 +512,7 @@ def two_link_distance(
             # Step 3: store the minimised value for this 2-link.
             dists_links.append(int(per_p[best_at]))
             p_star = int(scan[best_at])
+            chosen_past.append(p_star)
             interval_sizes.append(int(np.count_nonzero(cm[p_star, :] & cm[:, f])))
         # Step 4 is the loop above; Step 5 is the average below.
 
@@ -535,6 +548,8 @@ def two_link_distance(
         per_link_distance=values,
         per_link_chain_links=raw,
         per_link_interval_size=np.asarray(interval_sizes, dtype=int),
+        per_link_future=np.asarray(links_f, dtype=int),
+        per_link_past=np.asarray(chosen_past, dtype=int),
         n_past_candidates=int(common_past.size),
         n_past_scanned=int(scan.size),
     )

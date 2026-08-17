@@ -400,6 +400,8 @@ Finding 3's mechanism), or the factor-18 range may simply be too short. Either w
 a demonstrated contrast with the naive one.** The contrast remains an untested premise
 of the source paper as far as this work is concerned.
 
+This result is consistent with Rideout–Wallden's own reported experience rather than in tension with it: their demonstration of naive degradation required a deliberately anisotropic sprinkling region (growing in t and y at fixed x, targets at x=±4), because independent minimizing pairs concentrate near the light-cone intersection a hyperbola with a specific asymptotic direction, so isotropic volume growth adds volume mostly where such pairs do not live. They further estimated that reaching the fully degenerate result would require N ~ 512·e^512, and they too observed only a drift, never complete failure. Our isotropic factor-18 range therefore has no expectation of resolving the effect, and the unresolved contrast reflects the geometry of the test rather than a failure of the naive-degradation claim.
+
 (`naive_distance` uses the exact maximal-past × minimal-future reduction, which is
 provably identical to minimising over the full common past and future — not an
 approximation, and asserted against a brute-force scan in the tests.)
@@ -509,3 +511,193 @@ for trend tests, and a poor one for any comparison demanding per-causet accuracy
 - Head-to-head pairs must be chosen with the 17%-of-`D` quantum in mind: separations
   closer together than ~1 link cannot be rank-ordered by this estimator at `ρ = 60`,
   so the ≥20 pairs should span a wide range of true separations.
+
+---
+
+## 2026-08-17 — Phase 2b Part A DIAGNOSTIC: the −12% scale offset is fully accounted for
+
+- **Branch:** `phase2b-2d1` (Part A accepted at `49abc25`)
+- **Experiment:** `experiments/exp03b_offset_diagnostic.py`
+- **Figure:** `figures/exp03b_offset_diagnostic.png`
+- **Data:** `data/exp03b_diagnostic.npz`
+- **Seeds:** selected pairs reuse exp03's stream `20260817 + 10000·i + k` (so the
+  first 40 causets at each λ are literally the Gate-A causets); geometry-matched
+  controls `71820260`; unconditioned baseline `30820262`
+- **Scope:** diagnostic, **not a gate** — no pass/fail is issued. Its job is to close
+  or explicitly leave open the discrepancy logged above under the scale-offset finding.
+- **Tests:** `python -m pytest` → **98 passed** (2 new: the estimator now exposes the
+  selected `(p, f_i)` pair, asserted to reproduce the reported minimum)
+
+### Parameters
+- Same geometry as Gate A: `ρ = 60`, `D = 1`, box `λ·(4.0, 2.5, 5.0)`.
+- `λ ∈ {0.70, 1.00, 1.30}` with 400 / 400 / 150 causets → **1030 selected pairs**
+  from 578 non-empty causets.
+- **12 independent unconditioned sprinklings per causet** for the geometry-matched
+  control; 4000 plain diamonds per point for the unconditioned `m₃^eff` baseline.
+- Errors are standard errors **across causets** (pairs within a causet share a
+  sprinkling and a target pair, so they are aggregated per causet first).
+
+### The exact decomposition
+
+The reported estimate factorises with no free parameters. Writing
+`μ = ρ·η(3)·τ(p*,f)³` for the expected element count of the selected interval, using
+the **exact embedding** proper time `τ` of the selected pair (embedding information,
+used only to diagnose — never inside the estimator, the same separation Phase 2a made
+between `τ_c` and `τ̂_c`):
+
+    l_est/D  =  [ L / (m₃ μ^{1/3}) ]  ×  [ τ(p*,f)/D ]
+                  calibration ratio      geometric excess (≥ 1)
+
+| λ | pairs | causets | `l_est/D` | calibration | geometric `τ/D` | product |
+|------|-----|-----|-----------------|-----------------|-----------------|--------|
+| 0.70 | 361 | 222 | 0.8971 ± 0.0083 | 0.6734 ± 0.0059 | 1.3355 ± 0.0083 | 0.8994 |
+| 1.00 | 480 | 259 | 0.8644 ± 0.0073 | 0.6596 ± 0.0052 | 1.3142 ± 0.0067 | 0.8668 |
+| 1.30 | 189 |  97 | 0.8845 ± 0.0118 | 0.6627 ± 0.0080 | 1.3379 ± 0.0119 | 0.8866 |
+
+The product reproduces the measured estimate at every region size, so these two
+factors are a **complete** account — nothing else is left to explain.
+
+**The second factor is the one the hypothesis did not consider.** The estimator does
+not report the distance between `x` and `y`; it reports `d(p, f_i)`, the discrete
+proper time of the *selected pair*. In the continuum these coincide: `min_p τ(p,f)`
+over the common past equals `D` exactly, attained by the boost-matched partner. But
+the sprinkling need not contain that partner, and Step 2 minimises the **chain**, not
+the proper time. Hence `τ(p*,f) ≥ D` always — measured smallest value anywhere
+**1.0493**, never below 1, as required — and here it runs **31% above `D`**.
+
+### Hypothesis test — **CONFIRMED**, and it explains **0.8%** of the gap
+
+Geometry-matched control: the identical `p, f` *coordinates* dropped into 12
+independent unconditioned sprinklings of the same box at the same density. Same proper
+time, same boost, same distance from the boundary; only the selection is removed. Both
+samples carry the two deterministic target elements (which lie inside every selected
+interval, since `p ≺ x ≺ f`), so the matched Poisson expectation is `μ + 2`.
+
+| λ | `\|[p,f]\|` conditioned | control | ratio cond/ctrl | cond/(μ+2) | ctrl/(μ+2) |
+|------|--------------|--------------|-----------------|-----------------|-----------------|
+| 0.70 | 38.84 ± 0.81 | 40.56 ± 0.73 | 0.9593 ± 0.0098 | 0.9586 ± 0.0095 | 1.0012 ± 0.0029 |
+| 1.00 | 35.72 ± 0.62 | 38.70 ± 0.59 | 0.9276 ± 0.0093 | 0.9267 ± 0.0088 | 1.0015 ± 0.0026 |
+| 1.30 | 38.05 ± 1.22 | 40.94 ± 1.11 | 0.9263 ± 0.0154 | 0.9278 ± 0.0152 | 1.0033 ± 0.0043 |
+
+Combined **0.9398 ± 0.0062**, i.e. **9.75 σ below 1**. The conditioned intervals really
+are emptier — the hypothesis is **confirmed as a real effect**, and the mechanism is
+concrete: the selection forces three sub-regions of `[p,f]` to be empty (`[x,f]` and
+`[y,f]` by the 2-link condition, `fut(p) ∩ past(x) ∩ past(y)` by `p`'s maximality).
+
+**But it does not explain the offset.** The original prediction read RW's curve at the
+realised count 35.7; the hypothesis says read it at the true expected count 36.5. That
+moves `m₃^eff` from 1.7110 to 1.7133 and the predicted ratio from 0.748 to **0.7490** —
+closing **0.8% of the 0.130 gap**. The interval is emptier by ~6%, and `m₃^eff` varies
+far too slowly with size for a 6% shift to matter. *Confirmed, and irrelevant.*
+
+The λ = 0.70 ratio (0.959) sits above the other two (0.928, 0.926); with 2 dof that is
+a mild tension, plausibly because the smallest region leaves least room for the forced-
+empty sub-regions. Recorded, not resolved.
+
+**Control validation.** `ctrl/(μ+2) = 1.0012 ± 0.0029` — the unconditioned control
+reproduces the Poisson expectation exactly. That simultaneously confirms there is no
+boundary clipping of these intervals and that `μ` computed from the exact embedding is
+right, neither of which was assumed.
+
+### What the conditioning actually changes: the chain, not the interval
+
+| λ | `L` conditioned | `L` control | ratio | `m₃^eff` selected | `m₃^eff` control |
+|------|-----------------|-----------------|-----------------|-----------------|-----------------|
+| 0.70 | 5.1585 ± 0.0478 | 6.0337 ± 0.0432 | 0.8594 ± 0.0080 | 1.5462 ± 0.0135 | 1.8026 ± 0.0048 |
+| 1.00 | 4.9702 ± 0.0423 | 5.9273 ± 0.0366 | 0.8439 ± 0.0072 | 1.5144 ± 0.0120 | 1.7992 ± 0.0046 |
+| 1.30 | 5.0857 ± 0.0681 | 6.0816 ± 0.0635 | 0.8411 ± 0.0109 | 1.5215 ± 0.0183 | 1.8133 ± 0.0075 |
+
+The chain is suppressed by **16%**, nearly three times harder than the cardinality's
+6%, and for an obvious reason: **Step 2 minimises the chain over the common past**, so
+the selected chain is the shortest available across those two events by construction.
+
+This also reconciles the two framings, which superficially disagree. At matched
+*geometry* the conditioned interval is **smaller** (0.94); at matched *chain length* —
+the brief's intrinsic form, using no embedding at all — it is **larger**:
+
+| L | n cond | `\|[p,f]\|` cond | n ctrl | `\|[p,f]\|` ctrl | ratio |
+|---|-----|--------------|------|--------------|-----------------|
+| 3 |  11 | 20.27 ± 1.29 |   36 | 18.50 ± 0.70 | 1.0958 ± 0.0810 |
+| 4 | 217 | 28.27 ± 0.47 |  744 | 25.32 ± 0.20 | 1.1168 ± 0.0206 |
+| 5 | 517 | 36.24 ± 0.41 | 3301 | 31.95 ± 0.13 | 1.1342 ± 0.0135 |
+| 6 | 255 | 48.09 ± 0.83 | 4467 | 39.79 ± 0.14 | 1.2088 ± 0.0213 |
+| 7 |  30 | 52.60 ± 3.06 | 2706 | 48.25 ± 0.22 | 1.0902 ± 0.0637 |
+
+Both are the same fact: `L` falls 16% while cardinality falls only 6%, so at fixed `L`
+the conditioned interval must be the bigger one.
+
+### The 0.748 prediction was itself wrong
+
+RW's Fig.-4 fit was made over `ρV = 2¹⁰…2¹⁸`. The selected intervals sit at
+`ρV ≈ 36.6 = 2^5.2`, **4.8 octaves below its support** — so the original 0.748 rested
+on an extrapolation with no warrant. Measured directly instead (4000 plain diamonds
+per point, endpoints included, link convention, no conditioning):
+
+| ρV | `m₃^eff` measured | RW curve extrapolated | difference |
+|------|-----------------|--------|---------|
+| 16.0 | 1.7592 ± 0.0052 | 1.6237 | +0.1356 |
+| 24.0 | 1.7809 ± 0.0047 | 1.6693 | +0.1116 |
+| 32.0 | 1.7900 ± 0.0043 | 1.6997 | +0.0903 |
+| 40.0 | 1.8119 ± 0.0040 | 1.7224 | +0.0895 |
+| 48.0 | 1.8238 ± 0.0039 | 1.7402 | +0.0836 |
+| 64.0 | 1.8403 ± 0.0037 | 1.7672 | +0.0731 |
+
+The extrapolation understates `m₃^eff` by 0.07–0.14, with the gap shrinking as `ρV`
+rises toward the fitted window. This is **not** a disagreement with Rideout–Wallden —
+it is exactly the caveat Part 1 recorded (Finding 4 of the 2026-08-10 entry): `m₃ + aN^c`
+is an *effective* description over a finite window, not the true asymptotic expansion,
+so it must not be read outside it. Part 1 flagged the risk; this measures the cost.
+
+At `ρV = 36.6`: measured unconditioned `m₃^eff = 1.8027` (ratio **0.785**, not 0.748).
+Independently, the geometry-matched control gives `1.7992 ± 0.0046` at the same size —
+**two unrelated measurements of the unconditioned constant agreeing to 0.2%**.
+
+### Final accounting — the discrepancy is closed
+
+Every factor measured in this experiment, none fitted (λ = 1.00):
+
+    finite-size calibration, unconditioned at ρV = 36.6    × 0.7851
+    Step-2 minimisation suppressing the chain              × 0.8439
+    geometric excess  τ(p*,f)/D                            × 1.3142
+    ------------------------------------------------------------
+    product                                                = 0.8708
+    observed                                                 0.8644
+
+A residual of 0.7% remains, comparable to the interpolation of the baseline curve and
+to the slight non-Poisson enhancement from the two deterministic target elements inside
+each interval. Not chased further; recorded.
+
+### Interpretation (honest)
+
+**The offset was never a calibration puzzle — it is the near-cancellation of two large,
+opposite effects, and neither is the one that was hypothesised.** The estimator
+under-reports by 34% (a 21% finite-size calibration shortfall compounded with a 16%
+chain suppression from the Step-2 minimisation) and over-reports by 31% because the
+pair it actually measures is 31% further apart in proper time than the targets are.
+`0.66 × 1.31 = 0.87`. That two effects of ~30% each should cancel to 12% is a
+coincidence of these parameters, not a property of the construction — and that is the
+uncomfortable part, because **it means the −12% figure is not stable**. It is a
+difference of large terms with different `ρ` and `D` dependence, so it should not be
+carried forward as "the 2-link estimator reads ~12% low"; each application needs its
+own accounting.
+
+The logged hypothesis is **confirmed but immaterial**: conditioned intervals are
+genuinely emptier (9.75 σ), and that fact explains under 1% of what it was proposed to
+explain. Reported at the same prominence as the part that worked, because a confirmed
+effect of negligible size is exactly the kind of result that gets quietly upgraded into
+an explanation later.
+
+Two corrections to the previous entry follow from this and should be read with it:
+the original 0.748 was an unwarranted five-octave extrapolation (the right unconditioned
+number is 0.785), and the speculative mechanism offered there — "the appropriate ρV
+would then be larger than the realised count" — is real in direction but ~0.8% in size,
+not the compensation it was floated as.
+
+### Consequence for Part B
+
+The geometric excess `τ(p*,f)/D = 1.31` is a property of the *estimator's target*, not
+of its calibration: it does not shrink by fixing constants, only by the sprinkling
+supplying a better-matched past partner. Since it enters as a multiplicative factor on
+every pair, it should largely cancel in the **rank-ordering** test that Part B is
+specified on — but it will not cancel in any absolute-scale comparison against
+Boguñá–Krioukov, which reinforces why that comparison was specified on ordering.
