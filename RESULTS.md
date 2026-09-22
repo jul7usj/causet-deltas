@@ -1014,3 +1014,203 @@ and fine-grained but compresses out of its asymptotic regime.**
   here. Both are reported; neither is corrected.
 - **Open:** the fixed-`s`, varying-`T` diagnostic that would confirm or refute the
   asymptotic explanation of B–K's compression (Finding 9).
+
+---
+
+## 2026-09-23 — Phase 2b Part B DIAGNOSTIC: breaking Finding 9's confound (fixed s, varying T)
+
+- **Branch:** `phase2b-2d1` (follows the Part B entry of 2026-09-22)
+- **Experiment:** `experiments/exp05_bk_asymptotic_regime.py`
+- **Figure:** `figures/exp05_bk_asymptotic_regime.png` (4 panels)
+- **Raw data:** `data/exp05_measurements.npz` (per-causet **and** per-vantage-point values — 68 575 individual `(τ_c, d_c)` pairs, committed)
+- **Seeds:** `20260923 + 100000·i + k` (rung `i`, causet `k`)
+- **Scope:** **diagnostic, not a gate.** No pass/fail is issued. Its one job is to close or explicitly leave open the confound logged as Finding 9 on 2026-09-22.
+- **Tests:** `python -m pytest` → **124 passed** (no source module changed; this experiment adds no library code)
+
+### The confound this existed to break
+
+exp04 measured `B–K/true` falling 1.108 → 0.623 as `s` ran 0.30 → 2.00, while
+`τ_c/d` fell 4.77 → 1.18 over the same ladder, giving
+`Spearman(B–K/true, τ_c/d) = +1.0000`. That correlation was recorded as **worth
+nothing on its own**: both quantities are monotone in `s` by construction. This
+experiment holds `s = 1.0` FIXED and varies the box time extent instead, so depth
+moves without separation moving.
+
+**Geometry deliberately differs from exp03/exp04** (whose `T` was frozen at 4.0
+for comparability). No number here is comparable with those experiments on
+absolute scale, and none is so compared.
+
+### Parameters
+
+`ρ = 60` FIXED, `s = 1.0` FIXED, spatial extents `(Lx, Ly) = (2.5, 5.0)` FIXED.
+Box time extent `T ∈ {4, 6, 8, 10, 12}`. **Causet counts fall along the ladder —
+100, 100, 80, 60, 40 — because cost does forbid 100 throughout:** B–K's admissible
+`c` count grows 15.7 → 683.5 per causet, each needing two chain-count dynamic
+programs over larger interval sub-posets, so the rungs cost 26 s → 1052 s. Total
+380 causets, ⟨N⟩ = 3004 → 9025, 30.3 min. Every count is reported and every
+standard error computed from the count actually used.
+
+### Finding 1 — the independent variable moved, and by a lot
+
+| T | V | ⟨N⟩ | causets | ⟨τ_c⟩ | median τ_c/d | B–K ⟨n_c⟩ |
+|---|---|---|---|---|---|---|
+| 4 | 50 | 3004 | 100 | 1.49 | 1.67 ± 0.02 | 15.7 |
+| 6 | 75 | 4500 | 100 | 2.10 | 2.29 ± 0.02 | 50.3 |
+| 8 | 100 | 6010 | 80 | 3.02 | 3.75 ± 0.03 | 150.7 |
+| 10 | 125 | 7495 | 60 | 3.88 | 5.53 ± 0.08 | 376.3 |
+| 12 | 150 | 9025 | 40 | 4.59 | 6.94 ± 0.26 | 683.5 |
+
+`τ_c/d` spans **1.67 → 6.94, a factor 4.16** — from the marginal regime exp04
+operated in, well into `τ_c ≫ d` where eqs. 25–27 should hold. The diagnostic had
+the lever arm it needed.
+
+### Finding 2 — B–K/true FALLS as the region deepens; the RW control does not
+
+| T | median τ_c/d | B–K/true | n | RW/true | n |
+|---|---|---|---|---|---|
+| 4 | 1.67 | 0.8910 ± 0.0111 | 100 | 0.8566 ± 0.0120 | 65 |
+| 6 | 2.29 | 0.9128 ± 0.0063 | 100 | 0.8708 ± 0.0140 | 70 |
+| 8 | 3.75 | 0.8523 ± 0.0053 | 80 | 0.9109 ± 0.0172 | 48 |
+| 10 | 5.53 | 0.7584 ± 0.0075 | 60 | 0.8998 ± 0.0182 | 44 |
+| 12 | 6.94 | 0.7008 ± 0.0146 | 40 | 0.9045 ± 0.0234 | 29 |
+
+Weighted slopes of ratio vs T: **B–K `−0.02894 ± 0.00165` (17.5 σ)**, RW
+`+0.00729 ± 0.00264` (**2.8 σ**).
+
+Taken at face value this **refutes** the asymptotic explanation outright, and in
+the opposite direction to the prediction: deepening the region makes B–K *worse*.
+Finding 4 is why it must not be taken at face value.
+
+**The RW control, reported honestly:** RW drifts mildly *upward*, 0.857 → 0.905
+(+0.048 total). At 2.8 σ this sits below the 3 σ threshold fixed in advance, so it
+is not declared "moving" — but it is not flat either, and it is recorded as a weak
+positive drift rather than rounded to zero. Part A's Gate A found RW flat under
+**isotropic** growth (−0.009 ± 0.030 over a factor 18 in volume); growth in `T`
+alone is a different direction, and this is the first measurement of it. The
+signs are **opposite** and B–K's magnitude is 4× larger, so a common systematic
+driving both is excluded.
+
+### Finding 3 — per-vantage stratification: the confound-free test
+
+Each admissible `c` supplies its own `d_c` from its own depth `τ_c`. In the
+continuum the estimator should return the same answer from every vantage point —
+a deeper `c` has larger `τ_c` but correspondingly smaller `(1−O)`, and they
+compensate exactly. So a slope of `d_c/true` against `τ_c` is a direct test of
+eqs. 25–27, with no `s` dependence and (within a rung) no `T` dependence.
+
+**Stratified by `τ_c` ALONE, never by `τ_c/d_c`** — binning by the ratio would
+repeat exactly the circularity Finding 9 flagged, since `d_c` sits in its own
+denominator and a low `d_c` mechanically produces a high ratio.
+
+Pooled across rungs (8 equal-count bins, 8 571 vantage points each):
+
+| ⟨τ_c⟩ | 1.54 | 2.60 | 3.31 | 3.77 | 4.15 | 4.55 | 5.00 | 5.70 |
+|---|---|---|---|---|---|---|---|---|
+| `d_c`/true | 0.878 | **0.928** | 0.839 | 0.770 | 0.720 | 0.671 | 0.622 | 0.562 |
+
+**Non-monotone, peaking at τ_c ≈ 2.6.** Within each rung separately (T constant,
+so no T confound at all):
+
+| T | τ_c range | within-rung slope | σ | frac clipped in y |
+|---|---|---|---|---|
+| 4 | 0.68–2.57 | **+0.24292 ± 0.00952** | 25.5 | **0.00** |
+| 6 | 0.68–3.73 | +0.04785 ± 0.00258 | 18.5 | 0.33 |
+| 8 | 0.68–4.65 | −0.07699 ± 0.00123 | 62.8 | 0.76 |
+| 10 | 0.68–5.89 | −0.09535 ± 0.00076 | 124.9 | 0.91 |
+| 12 | 0.68–6.64 | −0.09715 ± 0.00050 | 192.6 | 0.95 |
+
+In the T = 4 rung the curve rises from **0.69 at τ_c ≈ 0.9 to 1.01 at τ_c ≈ 2.1** —
+essentially exact recovery at the top.
+
+**Caveat on those error bars:** vantage points inside one causet share a
+sprinkling and a target pair and are not independent, so the quoted σ are
+optimistic. The slopes are quoted for **direction and relative size**, not for
+their literal significance.
+
+### Finding 4 — a confound THIS experiment introduced: spatial clipping
+
+**Growing `T` alone does not isolate `τ_c`.** A common event at depth `τ` below the
+targets has a future light cone of radius ~`τ` by the time it reaches them, but the
+spatial half-extents were held fixed at `Lx/2 = 1.25` and `Ly/2 = 2.50`. Past those
+depths the Alexandrov interval is truncated by the **box**, not by the light cone.
+
+| T | ⟨τ_c⟩ | frac clipped in x | frac clipped in y | within-rung slope |
+|---|---|---|---|---|
+| 4 | 1.49 | 0.67 | **0.00** | **+0.243** |
+| 6 | 2.10 | 0.87 | 0.33 | +0.048 |
+| 8 | 3.02 | 0.96 | 0.76 | −0.077 |
+| 10 | 3.88 | 0.98 | 0.91 | −0.095 |
+| 12 | 4.59 | 0.99 | 0.95 | −0.097 |
+
+**The within-rung slope flips sign in lockstep with the y-clipping fraction**, and
+the pooled peak at `τ_c ≈ 2.6` sits essentially on the `Ly/2 = 2.50` threshold.
+Depth and clipping move together along this ladder, so the ladder cannot attribute
+the aggregate trend of Finding 2 to either one.
+
+This is a flaw in the experiment's own design, not in the estimator, and it is
+named rather than buried. Holding the spatial extent fixed was what made `τ_c` the
+only *nominal* variable — but in a spatially bounded box, growing `τ_c` necessarily
+grows clipping too.
+
+### Verdict — PARTIALLY SUPPORTED, and the ladder is not usable as built
+
+1. **In the least-clipped geometry — T = 4, exp04's own, where no vantage point is
+   clipped in y — deeper vantage points give BETTER estimates** (`+0.243 ± 0.010`),
+   reaching exact recovery at `τ_c ≈ 2.1`. That is the direction eqs. 25–27 predict,
+   measured at fixed `s` and fixed region, free of exp04's monotone-in-`s` confound.
+   **This positively supports the asymptotic explanation of exp04's large-s
+   compression, in the regime exp04 actually operated in.**
+2. **The aggregate T ladder points the other way** (−17.5 σ) — but it is confounded
+   with clipping, which switches on across exactly the rungs where the sign flips.
+   It is not evidence against (1), and it is not evidence for anything else either.
+
+So Finding 9's confound is **partly broken, not fully**. The asymptotic-breakdown
+explanation is upgraded from "consistent with" to "positively supported at small
+τ_c", but **the validity boundary of the 2+1 D B–K formula still cannot be stated
+quantitatively**, because this experiment's depth ladder is not clean beyond
+`τ_c ≈ 2.5`.
+
+**What would settle it, and has not been run:** repeat the ladder growing `Lx` and
+`Ly` in proportion to `T`, so the clipped fraction stays constant while `τ_c` grows.
+Part A's Gate A already used isotropic growth for exactly this kind of reason; this
+experiment should have too.
+
+### Interpretation (honest)
+
+**The headline is that the prepared hypothesis survived, but only after the
+experiment built to test it was found to be testing two things at once.** Had the
+T-ladder result been reported alone it would have read as a clean 17.5 σ refutation,
+and it would have been wrong. Had the within-rung result been reported alone it
+would have read as a clean confirmation, and it would have been overstated. Both are
+reported, and the reason they disagree is measured rather than argued.
+
+**The most useful number to come out of this is one nobody asked for:** B–K's
+per-vantage accuracy is strongly depth-dependent and peaks near `τ_c ≈ 2–2.5`,
+where it recovers the true separation to ~1 %. The aggregate estimator averages
+over *all* admissible `c`, shallow ones included, which is what drags it to
+0.85–0.91. **Untested suggestion, logged as a suggestion and nothing more:**
+selecting or weighting vantage points by depth — keeping `τ_c` in the range where
+the per-vantage curve peaks and below the clipping threshold — may recover much of
+the gap. It has not been implemented, has not been validated, and would need its
+own acceptance test before being used for anything.
+
+**A second, weaker observation worth recording:** RW drifts upward by +0.048 across
+the T ladder (2.8 σ). Part A established RW flatness under isotropic growth; under
+anisotropic growth in `T` alone this is the first look, and it is not perfectly
+flat. Below the pre-set threshold, so not claimed as an effect — but logged, because
+it is the kind of sub-threshold drift that gets quietly forgotten and then
+rediscovered as a surprise.
+
+### Consequence for Phase 4 (revising the 2026-09-22 entry)
+
+- The recommendation to prefer **B–K** as the primary Δs benchmark is **unchanged
+  and strengthened**: its accuracy problem now has a located, depth-dependent
+  structure rather than being an unexplained compression.
+- The previous entry's advice to restrict B–K to `s ≲ 0.75` (`τ_c/d ≳ 2`) is
+  **superseded in form**: the controlling variable is the *vantage-point depth*
+  `τ_c`, not the separation, and the useful window is bounded **above** by boundary
+  clipping as well as below by the asymptotic breakdown. The numerical window
+  cannot be stated until the isotropic-growth ladder is run.
+- **Open, and now more sharply posed than before:** the isotropic version of this
+  ladder (grow `Lx`, `Ly` with `T`). Until it is run, no quantitative validity
+  boundary for the 2+1 D B–K distance should be quoted from this work.
