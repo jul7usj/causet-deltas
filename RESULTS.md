@@ -701,3 +701,316 @@ supplying a better-matched past partner. Since it enters as a multiplicative fac
 every pair, it should largely cancel in the **rank-ordering** test that Part B is
 specified on — but it will not cancel in any absolute-scale comparison against
 Boguñá–Krioukov, which reinforces why that comparison was specified on ordering.
+
+---
+
+## 2026-09-22 — Phase 2b Part B acceptance: Boguñá–Krioukov in 2+1 D and the head-to-head rank-ordering gate
+
+- **Branch:** `phase2b-2d1` (built on Part A `49abc25` and its diagnostic `1398f53`)
+- **Module:** `src/causet/causal_overlap_3d.py` (Part B1) — `causal_overlap.py` is **not modified**
+- **Experiment:** `experiments/exp04_rw_vs_bk_2p1d.py` (Part B2)
+- **Figure:** `figures/exp04_rw_vs_bk_2p1d.png` (6 panels)
+- **Raw data:** `data/exp04_measurements.npz` (per-causet values for all 24×100 evaluations; 211 kB, committed, so every number below is re-derivable without repeating the 10.5-min measurement)
+- **Source papers:** Boguñá & Krioukov, arXiv:2401.17376 (overlap eqs. 16/28, exact 1+1 D eqs. 23–24, **asymptotic eqs. 25–27**, depth estimator eq. 38, Filter 2 eq. 34); Rideout & Wallden, arXiv:0810.1768 (eqs. 1–2, Sec. V.A)
+- **Seeds:** `20260922 + k`, `k = 0…99` — one Poisson background per seed, **re-used across all 24 separations**
+- **Tests:** `python -m pytest` → **124 passed** (98 from Phase 1/2a/Part 1/Part A, unchanged + 26 new in `tests/test_causal_overlap_3d.py`)
+
+### The constraint this phase was designed around
+
+Part A's diagnostic (2026-08-17 entry) established that the 2-link estimator's −12 %
+offset is a near-cancellation of a 0.7851 × 0.8439 calibration/suppression shortfall
+against a 1.3142 geometric excess, with **different ρ and D dependence**. It is not a
+stable estimator property and is **nowhere** subtracted, divided out, or fitted in this
+work. Consequently the head-to-head is specified on **rank ordering**, which is
+invariant under any monotone rescaling, and **no absolute-scale comparison between the
+two estimators is made or is licensed by anything below.**
+
+---
+
+## Part B1 — the 2+1 D causal overlap
+
+### The dimension split, and what was reused
+
+The overlap **ratio** `O = N[C]/(min(N[A],N[B]) + N[C])` (eqs. 16/28) is built from
+Alexandrov-interval cardinalities alone and is dimension-agnostic, so
+`alexandrov_interval`, `overlap_partition`, `causal_overlap`, `common_past`,
+`filter2_passes` and `chain_count` are **re-exported from Phase 2a verbatim**. Only the
+distance formula and the proper-time calibration change with dimension. Phase 2a is
+therefore left untouched, in the same relation `order3d.py` bears to `order.py`.
+
+**Notation clash, documented because it silently corrupts exponents:** Boguñá–Krioukov's
+`d` is the **spatial** dimension (1 for M², 2 for M³); Rideout–Wallden's `d`, used
+throughout `order3d`/`sprinkle3d`/`rideout_wallden`, is the **spacetime** dimension
+(2 and 3). Every crossing goes through one function, `spacetime_dim_from_spatial`.
+
+### The `c₂` derivation, checked three ways
+
+    c_d = (d+1)/√π · Γ(d/2)/Γ((d+1)/2)                                    (eq. 27)
+    c₂  = 3/√π · Γ(1)/Γ(3/2) = 3/√π · 1/(√π/2) = 6/π = 1.9098593171027443
+    ⇒ prefactor 2/c₂ = π/3 = 1.0471975511965976
+
+Computed by `overlap_coefficient_c`, never hardcoded. Verified against
+`scipy.special.gamma` for d = 1…7 (≤1e−14), against the closed form 6/π (0.0 absolute),
+and — the check that actually constrains the **factor** — against Phase 2a: the same
+formula gives `c₁ = 2` exactly, so the asymptotic form reads `d = τ_c(1−O)`, which is
+precisely the `O → 1` limit of the exact eq. 24 `d = τ_c(1−O)/√O`. The measured ratio
+is `1/√O` and converges 1.41421 → 1.00005 over `O = 0.5…0.9999`. No test of the d = 2
+code alone could have caught a factor error here.
+
+### `α_d` from the chain law, and which `m₃`
+
+    RW eq.(1)+(2):  L = m_D · l · (ρη(D))^{1/D}  ⇒  l = [1/(m_D η(D)^{1/D})] ρ^{−1/D} L
+    vs B–K eq. 38:  τ = α_d ρ^{−1/(d+1)} L,  D = d+1
+    ⇒  α_d = 1 / ( m_D · η(D)^{1/D} )
+
+Reproduces Phase 2a: `α₁ = 1/(2·(1/2)^{1/2}) = 1/√2`, agreeing with the hardcoded
+`ALPHA_1` to 1 ulp (the d = 1 path keeps the Phase 2a literal, which is what lets the
+regression below demand *bit* identity rather than a tolerance).
+
+**`m₃ = 2.296` is not used.** It is the asymptote of a fit supported only over
+`ρV = 2¹⁰…2¹⁸`, and eq. 38 is applied to intervals of ~37 elements — 5 octaves below
+that support, the exact error Part A's diagnostic traced the discarded 0.748 prediction
+to. The module instead carries `M3_EFF_MEASURED`, a 14-row **measured** curve assembled
+from this repository's own committed data and nothing else: `ρV = 16…64` from
+`data/exp03b_diagnostic.npz`, `ρV = 2¹⁰…2¹⁷` re-reduced from `data/exp02_measurements.npz`
+with the link convention `L = elements − 1`. A test re-derives all 14 rows from those
+files at 1e−12, so the literals cannot drift from their source.
+
+| calibration | m₃ | α₂ |
+|---|---|---|
+| measured `m₃^eff` at ρV = 64 | 1.8403 | **0.84941** |
+| published asymptote | 2.296 | 0.68083 |
+
+A 25 % difference — not a cosmetic choice. `m3_effective()` returns a **status** with
+every read (`measured` / `interpolated_gap` / `extrapolated_low` / `extrapolated_high`),
+so no caller can silently consume an extrapolation. The genuinely unmeasured four-octave
+gap between `ρV = 64` and `1024` is flagged, not smoothed over.
+
+### WEAKER ACCURACY CLAIM THAN PHASE 2a — stated wherever a 2+1 D B–K number appears
+
+Phase 2a's 1+1 D result rests on an **exact** inversion valid at every overlap. The
+2+1 D number is the **leading-order** eqs. 25–27, valid only for `τ_c ≫ separation`.
+The realised `τ_c/d_est` is recorded for every admissible common event
+(`per_c_asymptotic_ratio`), so the regime is auditable rather than assumed — see
+Finding 5.
+
+### Tests (26 new)
+
+Four tiers. Constants (above). **Hand-built M³ causets** with A/B/C partitions worked out
+by hand and every underlying relation asserted individually: `A={p2}, B={p3},
+C={p0,p1,p4}`, `O = 3/4`; a timelike pair gives `O = 1`. One element, `p5`, sits off the
+`y = 0` plane specifically so that dropping the third coordinate would misclassify it
+into region C — asserted as an explicit negative control, so the test provably exercises
+2+1 D structure. **Documented divergence:** `order3d`'s strict convention makes
+exactly-null pairs *unrelated*, so B–K's "O = 1 for timelike/null" holds here for
+timelike only; measure-zero for sprinklings, asserted rather than left as a surprise.
+
+**The 1+1 D regression passes on bit identity, not tolerance.**
+`distance_causal_overlap_nd(d=1)` reproduces `causal_overlap.distance_causal_overlap`
+exactly — `distance`, `sem`, and all three per-`c` arrays compared with `==` over 8
+sprinklings, plus component-level identity for `estimate_tau_c_nd` and
+`distance_from_overlap_nd`. This is what licenses leaving Phase 2a unmodified. (It
+required implementing eq. 38 in its literal factored spelling when a single α applies:
+`a·(x+y)` and `a·x+a·y` differ in the last ulp in IEEE-754.)
+
+Two bugs were caught by these tests and fixed: `searchsorted(side="left")` labelled the
+measured nodes at `ρV = 64` and `1024` as `interpolated_gap` because they border the
+gap; and the table literals, first transcribed at ~9 digits, carried 3e−9 error — the
+literals were regenerated at full precision rather than the provenance check loosened.
+
+---
+
+## Part B2 — the head-to-head, GATE B
+
+### Parameters — identical to Part A's Gate A, deliberately not deepened
+
+`ρ = 60`, box `(T, Lx, Ly) = (4.0, 2.5, 5.0)`, targets at the mid-time on the x axis,
+`x_± = (T/2, ±s/2, 0)`. **24 distinct separations** `s = 0.30…2.00` (spacing 0.0739; top
+capped by `Lx = 2.5`), each measured on the **same 100 Poisson backgrounds** — only the
+two injected target events move, so both estimators see a bit-identical causal matrix for
+every (seed, separation). ⟨N⟩ = 3005. 2400 causal matrices, 10.5 min, one core.
+
+The geometry was held at Part A's values rather than deepened in `T`: deepening would
+improve B–K's asymptotic ratio but make the usability numbers incomparable with Part A's
+1.16 2-links/causet and 36 % empty — and the asymptotic ratio limits **accuracy**, which
+is not under test.
+
+**Calibration asymmetry, intentional:** RW uses Part A's code unchanged (published
+`m₃ = 2.296`, exactly as `exp03` called it); B–K uses the measured `m₃^eff` curve. ~25 %
+apart, a pure per-estimator scale, invisible to rank ordering and fatal to any accuracy
+comparison. Which is the point.
+
+**RW's resolution floor, stated before the numbers:** one chain link = **0.1739** at this
+density, and every minimising interval contains both targets (`p ≺ x ≺ f`), so `L ≥ 2`
+and no single measurement can return below **0.3478**. The ladder spacing (0.0739) is
+*below* that quantum: a single causet cannot order neighbouring pairs. The gate ranks
+means over 100 causets, whose SE (~0.01–0.02) is well under the spacing.
+
+### Finding 1 — the measurements (abridged; full table in the experiment output)
+
+| s_true | RW 2-link | n | B–K (meas. m₃) | n | 2-links/causet | empty | ⟨n_c⟩ | τ_c/d |
+|--------|-----------|---|----------------|---|----------------|-------|-------|-------|
+| 0.300 | 0.4331 ± 0.0070 | 95 | 0.3325 ± 0.0077 | 100 | 6.07 | 5 % | 39.2 | 4.77 |
+| 0.522 | 0.5469 ± 0.0085 | 92 | 0.5341 ± 0.0082 | 100 | 3.22 | 8 % | 27.5 | 2.76 |
+| 0.743 | 0.6976 ± 0.0098 | 83 | 0.7185 ± 0.0098 | 100 | 1.96 | 17 % | 20.0 | 2.05 |
+| 0.965 | 0.8430 ± 0.0123 | 71 | 0.8723 ± 0.0104 | 100 | 1.24 | 29 % | 16.2 | 1.71 |
+| 1.187 | 1.0336 ± 0.0144 | 67 | 0.9884 ± 0.0123 | 100 | 1.12 | 33 % | 13.0 | 1.49 |
+| 1.409 | 1.2436 ± 0.0203 | 44 | 1.0880 ± 0.0109 | 100 | 0.68 | 56 % | 10.1 | 1.35 |
+| 1.630 | 1.3682 ± 0.0235 | 39 | 1.1521 ± 0.0129 | 100 | 0.53 | 61 % | 7.7 | 1.28 |
+| 2.000 | 1.6990 ± 0.0239 | 34 | 1.2468 ± 0.0142 | 100 | 0.42 | 66 % | 5.0 | 1.18 |
+
+Errors are standard errors **across causets** (measurements within one causet share a
+sprinkling and a target pair and are not independent — Part A's convention).
+
+### Finding 2 — GATE B: **PASSES** on all three criteria
+
+| pairing | n pairs | Spearman ρ_s | p |
+|---|---|---|---|
+| RW vs TRUE separation | 24 | **+1.0000** | 1.09e−173 |
+| B–K (measured m₃) vs TRUE | 24 | **+1.0000** | 1.09e−173 |
+| RW vs B–K (measured m₃) | 24 | **+1.0000** | 1.09e−173 |
+| B–K fixed α₂ vs TRUE | 24 | +1.0000 | 1.09e−173 |
+| RW vs B–K fixed α₂ | 24 | +1.0000 | 1.09e−173 |
+| B–K fixed vs B–K measured | 24 | +1.0000 | 1.09e−173 |
+
+Criteria were fixed before the verdict: ρ_s > 0 and p < 0.01 on (B-i) RW vs true,
+(B-ii) B–K vs true, (B-iii) RW vs B–K. **All pass.** Finding 8 assesses how much this
+is worth.
+
+### Finding 3 — ordering inversions: **zero**
+
+**0 inverted (i,j) orderings out of 276 comparable pairs.** The inversion check was built
+to classify each discordance by whether *each* estimator resolves its own difference at
+>2 combined SE — distinguishing a genuine disagreement about order from two estimators
+failing to separate two pairs. It found nothing to classify.
+
+### Finding 4 — practical usability: the two estimators are not close
+
+| | RW 2-link | B–K causal overlap |
+|---|---|---|
+| samples per causet (all 2400 evaluations) | **1.61** | **15.9** admissible `c` (from 249 candidates) |
+| evaluations producing **nothing** | **897/2400 = 37 %** | **1/2400 = 0.04 %** |
+| at s ≈ 1.0 | 1.24/causet, 29 % empty | 16.2/causet, 0 % empty |
+| pairs with <10 usable causets of 100 | 0/24 | 0/24 |
+
+The s ≈ 1.0 row reproduces Part A's independently measured 1.16/causet and 36 % empty —
+a like-for-like cross-check across two experiments and two seed streams.
+
+**New, and not measurable from Part A's design** (which varied the region at fixed `s`,
+never `s` at fixed region): RW's 2-link yield falls as **s^−1.46** over this ladder,
+from 6.07 per causet at `s = 0.30` to 0.42 at `s = 2.00`, with the empty rate rising
+**5 % → 66 %**. B–K's admissible-`c` count also falls (39.2 → 5.0) but never to zero.
+
+### Finding 5 — asymptotic-regime audit: B–K sits at the EDGE of its regime
+
+`τ_c/d_est` over all causets: median **1.54**, 10th percentile **1.19**, worst single
+vantage point **0.99**. By separation it runs **4.77 at s = 0.30 down to 1.18 at
+s = 2.00**. eqs. 25–27 require `τ_c ≫ separation`; values of order 1–2 are **not** that.
+
+This is reported as a limit on **accuracy**, which no claim here depends on. The `m₃^eff`
+curve was read at a mean interval size of **37 elements** — inside the measured range,
+requiring no extrapolation.
+
+### Finding 6 — the α policy moves no rank (robustness)
+
+Fixed `α₂ = 0.84941` (a constant, hence a pure global scale) versus the `measured_m3`
+policy (read per interval, hence genuinely pair-dependent — B1's tests assert both
+properties). Over the same 100 causets: **0 of 24 ranks differ**, Spearman(fixed,
+measured) = +1.0000. The gate does not rest on which policy was chosen.
+
+### Finding 7 — ordering on a SINGLE causet: the test with teeth
+
+The aggregate gate ranks *means over 100 causets*, which suppresses exactly the noise
+that would produce an inversion — and Phase 4 will not have 100 causets per pair. Per
+causet (RW resolves 15.0 of the 24 separations on an average causet):
+
+| pairing | median ρ_s | mean ρ_s | min | n causets |
+|---|---|---|---|---|
+| RW vs TRUE | +0.976 | +0.965 ± 0.003 | +0.807 | 100 |
+| B–K vs TRUE | +0.960 | +0.934 ± 0.007 | +0.660 | 100 |
+| RW vs B–K | +0.949 | +0.937 ± 0.005 | +0.629 | 100 |
+
+**Strong but not perfect.** These, not the aggregate 1.0000, are the numbers Phase 4
+should carry.
+
+### Finding 8 — could the aggregate gate have failed? Barely
+
+Bootstrapping the 100 causets (2000 replicates, resampled with replacement), the
+aggregate Spearman(RW, B–K) spans **[0.9948, 1.0000]** with median 0.9991. Both
+estimators are strongly monotone in `s` and the per-pair standard errors (~0.01–0.02)
+sit far below the ladder spacing (0.0739), so **the aggregate test was never at serious
+risk of failing.** It rules out gross ordering disagreement and nothing finer. Recorded
+at the same prominence as the PASS, because a gate that could not have failed is weak
+evidence however small its p-value.
+
+### Finding 9 — B–K compresses at large separation; RW does not. Cause NOT established
+
+| s | B–K/true | RW/true | τ_c/d | RW 2-links/causet |
+|---|---|---|---|---|
+| 0.300 | 1.108 | 1.444 | 4.77 | 6.07 |
+| 0.743 | 0.966 | 0.938 | 2.05 | 1.96 |
+| 1.187 | 0.833 | 0.871 | 1.49 | 1.12 |
+| 1.630 | 0.707 | 0.839 | 1.28 | 0.53 |
+| 2.000 | 0.623 | 0.850 | 1.18 | 0.42 |
+
+B–K/true falls monotonically **1.108 → 0.623**. RW/true is non-monotone: **1.444** at the
+smallest separation, where the 2-link floor of 0.3478 inflates it, then **0.83–0.85**
+across the rest.
+
+`Spearman(B–K/true, τ_c/d) = +1.0000`. **This number is confounded and is not evidence
+of a mechanism.** Both quantities are monotone functions of `s` by construction — B–K/true
+because the estimator compresses, τ_c/d because a wider pair has less room above it in a
+fixed box — so a rank correlation of ~1 between them is what two monotone functions of a
+common variable always give, mechanism or not. It is reported because it is *consistent*
+with the eqs. 25–27 breakdown, and for no stronger reason.
+
+**What would actually test it, and was not done:** hold `s` fixed and vary the box time
+extent, moving τ_c/d without moving `s`. If B–K/true rose toward 1 as the region deepened
+at fixed `s`, the asymptotic explanation would be established; if it did not, the
+compression has another cause. **Logged as an open question, not a conclusion.**
+
+### Interpretation (honest)
+
+**Gate B passes, and the pass is real but weaker than its p-value suggests.** The two
+published estimators, run on bit-identical causal matrices with deliberately different
+and separately unreliable calibrations, agree perfectly on the ordering of 24 spacelike
+pairs and each agrees perfectly with the truth — 0 inversions in 276 comparisons. That is
+the property the cross-check existed to establish, and it is established.
+
+But Finding 8 is the honest qualifier: with both estimators strongly monotone and 100
+causets of averaging, the aggregate test had almost no room to fail. The informative
+result is Finding 7 — on a **single** causet the agreement is 0.95–0.98 median and dips
+to 0.63 at worst. Two estimators that agree perfectly in aggregate still disagree
+measurably one causet at a time, and Phase 4 lives in the single-causet regime.
+
+The second qualifier is Finding 9. B–K's 2+1 D distance is an asymptotic form used at
+`τ_c/d ≈ 1.2–1.5` over most of the ladder, and it compresses badly there — reading 62 %
+of truth at `s = 2.00`. That the compression tracks the asymptotic ratio is *consistent*
+with the formula's own stated validity condition, but the correlation is confounded
+through `s` and does not establish it; the fixed-`s`, varying-`T` experiment that would
+is named above and not done. Ordering survives the compression, which is why the gate is
+specified on ordering — but the compression is monotone and would eventually collapse
+ranks if extended further.
+
+**The usability gap is the most consequential result for Phase 4, and it is not close.**
+B–K returned an estimate on 2399 of 2400 evaluations with ~16 vantage points each; RW
+returned nothing on 37 % of them and averaged 1.6 samples when it did, with a hard
+resolution floor of 0.3478 and a yield falling as `s^−1.46`. Against that, RW tracks the
+truth linearly across the whole range while B–K flattens. The two estimators fail in
+opposite directions: **RW is accurate in shape but scarce and coarse; B–K is abundant
+and fine-grained but compresses out of its asymptotic regime.**
+
+### Consequence for Phase 4
+
+- Use **B–K causal overlap** as the primary Δs benchmark: it yields ~16 independent
+  vantage points per causet against RW's 1.6, and effectively never fails.
+- Restrict it to the regime where its asymptotic form holds. On this geometry that means
+  `s ≲ 0.75` (`τ_c/d ≳ 2`); beyond that its compression is a real distortion of magnitude,
+  though not of order.
+- Keep **RW 2-link** as an independent cross-check on ordering only, not as a per-causet
+  measurement: 37 % of causets return nothing and the 0.3478 floor is 35 % of `D = 1`.
+- Neither estimator's scale may be carried forward. RW's offset is the unstable
+  cancellation of Part A's diagnostic; B–K's is an asymptotic-regime artefact measured
+  here. Both are reported; neither is corrected.
+- **Open:** the fixed-`s`, varying-`T` diagnostic that would confirm or refute the
+  asymptotic explanation of B–K's compression (Finding 9).
