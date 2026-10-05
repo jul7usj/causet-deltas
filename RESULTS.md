@@ -1214,3 +1214,73 @@ rediscovered as a surprise.
 - **Open, and now more sharply posed than before:** the isotropic version of this
   ladder (grow `Lx`, `Ly` with `T`). Until it is run, no quantitative validity
   boundary for the 2+1 D B–K distance should be quoted from this work.
+
+---
+
+## 2026-10-05 — Phase 3a Part 1: SJ construction, source verification (pre-gate)
+
+- **Branch:** `phase3-sj` (identical to `master` @ `70e23f8` at start)
+- **Code:** `src/causet/sj.py` (new); `tests/test_sj.py` (new, 40 tests). `sprinkle.py` / `order.py` untouched.
+- **Tests:** `python -m pytest` → **164 passed** (124 existing + 40 new)
+- **Scope:** construction and structural validation only. **No gate has been run.** No Δs quantity is implemented.
+- **Sources read in full LaTeX** (arXiv e-prints, equations quoted by their `\label`):
+  Johnston 0806.3083; Johnston thesis 1010.5514; Sorkin 1703.00610; Afshordi–Aslanbeigi–Sorkin 1205.1296;
+  Afshordi–Buck–Dowker–Rideout–Sorkin–Yazdi (ABDRSY) 1207.7101; Saravani–Sorkin–Yazdi (SSY) 1311.7146;
+  Sorkin–Yazdi (SY) 1611.10281.
+
+### The verified Green-function index convention
+
+`G_R = ½ C` with `C_xy = 1 iff x ≺ y` — **first index is the earlier element.** This is
+SY 1611.10281 §3 (unnumbered display, verbatim: "G_R = ½C, where C is the causal matrix,
+C_xy := 1 if x ≺ y") and Johnston (0806.3083 §2.1: `K_ij` is the amplitude *from* `v_i`
+*to* `v_j`; eq. (1+1Amplitudes) `a = ½`, `b = −m²/ρ`; thesis: "for sprinklings into M², K_R = ½C").
+It coincides with `order.causal_matrix_1d`, so **no transpose is applied**.
+
+The continuum papers (Sorkin 1703.00610 §2, "G(x,y)=0 unless x ≻ y"; AAS 1205.1296; ABDRSY
+eq. (pjdef)) use the **opposite index order and the opposite sign** (they solve `(□ − m²)G = δ`
+in signature (−,+), giving `G = −½θ(u)θ(v)`, Sorkin 1703.00610 §2). The two conventions
+agree on the physical commutator:
+
+    iΔ_xy = +i/2 (x ≺ y),  −i/2 (y ≺ x),  0 (spacelike)   — ABDRSY eq. (36).
+
+Mixing the two (continuum index order with Johnston's +½) conjugates iΔ and swaps W ↔ W̄ —
+retarded ↔ advanced. **This error is in the published record:** ABDRSY's footnote to
+eq. (SJfunctions2) reports it in the continuum section of Johnston's thesis (whose `f_k, g_k`
+are the conjugates of the correct ones). Johnston's *discrete* construction is correct.
+
+**Independent physical confirmation (not just source-reading):** on sprinkled diamonds
+(seeds 0–4, N = 367–442, ρ = 800, τ = 1) the top eigenvector of iΔ has overlap
+**0.994–0.999** with the continuum *positive-frequency* mode `g_k = e^{−iku}+e^{−ikv}−2cos kL`,
+`tan kL = 2kL` (ABDRSY eq. (SJfunctions2)), and **≤ 0.001** with its conjugate.
+Now a test (`test_top_mode_is_positive_frequency`, seeds 11–13).
+
+**Mutation check of the tests** (monkeypatched `retarded_green_2d`, full `test_sj.py` rerun):
+transpose only → 13 failures across 7 tests; sign flip only → same 13; transpose **and**
+sign flip (the continuum convention applied consistently, identical iΔ) → only the 4
+explicit index-convention failures, all physics tests pass — as they should; taking the
+negative part of iΔ → 11 failures. The suite discriminates exactly the errors it targets.
+
+### Discrepancies between the Phase-3a brief and the sources (sources win)
+
+| # | Brief said | Sources say | Consequence |
+|---|---|---|---|
+| D1 | `G_R = ½C`, convention to confirm | Confirmed **given** `C_xy = 1 iff x ≺ y` (SY §3). Continuum papers index the other way with opposite sign (above). | None for code; documented in `sj.py` docstring. |
+| D2 | Identity "`W − W^T(conj) = iΔ`" | The identity is `W − W̄ = iΔ` with **elementwise** conjugate (ABDRSY §2 condition 1; Sorkin eq. (15)). Since W is Hermitian, `W̄ = W^T`; `W − W†` is identically 0. | Tests use elementwise `conj`. |
+| D3 | Gate 2 continuum target from AAS 1205.1296 | AAS contains no diamond W; it defers to "[Yasaman]" (AAS line ~781). The 2d-diamond SJ W is **ABDRSY 1207.7101**: eqs. (47), (SJbox), centre limit (SJtpcentrecomplete), `ε_centre ≈ −0.063`; causet comparison §5, ρ = 1, N = 2048, Re part, timelike pairs, centre region = 8% of area. | Gate 2 cites ABDRSY. |
+| D4 | Gate 3 from SSY 1311.7146 (volume law untruncated; truncation → log law) | SSY is a **continuum** calculation (mode cutoff `k_max`, `a = 1/k_max`, fit `b = 0.33277`). The **causet** volume law and the truncation are in **SY 1611.10281** §3: untruncated `S = aN_ℓ + b` with `a = 0.46` (ℓ/L = ¼), `0.32` (ℓ/L = ½); truncation `λ̃_min ~ √N/4π`, applied **twice** (large diamond with `N_L`, then restricted small diamond with `N_ℓ`); fit `S = a ln(√N_ℓ/4π) + b` → **`a = 0.346 ± 0.028`**, `b = 1.883 ± 0.035` at ℓ/L = ½. SSY supplies the entropy formula, `W v = iλΔv`, `Δv ≠ 0`, `S = Σ λ ln|λ|` (eqs. (gee), (s4)). | Gate 3 benchmark is SY's 0.346 ± 0.028, CFT 1/3. Note SY's cut is stated only as "∼"; its exact prefactor is a reproduction risk to report, not to tune. |
+| D5 | `experiments/exp05_sj_1p1d.py` | `exp05_bk_asymptotic_regime.py` already exists. | Propose `exp06_sj_1p1d.py`. |
+
+### Constants introduced (Rule 4)
+
+- `GREEN_2D_AMPLITUDE = 0.5` — Johnston 0806.3083 eq. (1+1Amplitudes), SY 1611.10281 §3.
+- `ZERO_EIG_RTOL_PER_N = machine eps` — an iΔ eigenvalue is a numerical zero if
+  `|λ| ≤ N·eps·max|λ|` (the `numpy.linalg.matrix_rank` threshold). Numerical only; it is
+  **not** the SY physical truncation, which belongs to Gate 3.
+- Normalisation: no density factor in any matrix. Matrix eigenvalues = ρ × continuum
+  eigenvalues (SY §3); matrix entries `W_xy` ≈ continuum kernel `W(X_x, X_y)` directly.
+
+### Honest line
+
+The construction is three lines of linear algebra; the risk was entirely in the convention,
+and that is now pinned by three agreeing sources plus a sprinkling-level physics check that a
+transpose cannot pass. Nothing about agreement with the continuum has been claimed yet.
