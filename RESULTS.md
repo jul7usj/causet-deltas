@@ -1284,3 +1284,110 @@ negative part of iΔ → 11 failures. The suite discriminates exactly the errors
 The construction is three lines of linear algebra; the risk was entirely in the convention,
 and that is now pinned by three agreeing sources plus a sprinkling-level physics check that a
 transpose cannot pass. Nothing about agreement with the continuum has been claimed yet.
+
+---
+
+## 2026-10-05 — Phase 3a GATE 1: iΔ spectrum vs the continuum diamond — PASS, with a discrepancy against Sorkin–Yazdi's √N/4π landmark
+
+- **Branch:** `phase3-sj` (on top of `b5e92d9`, Part 1)
+- **Experiment:** `experiments/exp06_sj_1p1d.py gate1` (`exp05` name was taken — see Part 1 entry, D5)
+- **Figure:** `figures/exp06_gate1_spectrum.png` (4 panels)
+- **Raw data:** `data/exp06_gate1_spectra.npz` — every eigenvalue of every realisation, plus N and relation count
+- **Seeds:** `20261005 + 100000·i + k` (rung `i`, realisation `k`); bootstrap seed 77, 2000 resamples
+- **New library code:** `src/causet/sj_continuum.py` (continuum diamond spectrum, ABDRSY eqs. (SJfunctions1)–(SJfunctions2); pole-free root finder for tan x = 2x). `tests/test_sj_continuum.py`, 5 tests, incl. ABDRSY eq. (46) completeness Σ_g 1/x² = 5/6 to 1e-7.
+- **Tests:** `python -m pytest` → **169 passed**
+
+### Disclosure: what was seen before the criteria were fixed
+
+One exploratory realisation (N = 1035, seed 999999, outside the run's seed range) was
+inspected before writing the experiment; it showed a gradual roll-off rather than a sharp
+break, which is why the knee is threshold-defined. The knee definition and the G1-A/B/C
+criteria were then written into the experiment docstring. A smoke run (N ≤ 512, ≤ 20
+realisations, discarded cache) was executed before the real run to test the pipeline; it
+already hinted at m* ∝ N. **No criterion, threshold or definition was changed after either
+look.**
+
+### Parameters
+
+τ = 1, ρ = N_nom / V. N_nom ∈ {256, 512, 1024, 2048, 4096}; realisations R = {320, 160, 80, 40, 20}
+(halving as N doubles — realisation count preferred over N). Continuum prediction per
+realisation λ_m^pred = N/(4 x_m) with ρ = N/V (SY §3 convention). Rank-ordered comparison,
+ratio r_m = λ_m^cs/λ_m^pred, ensemble mean r̄_m. Hermitian `numpy.linalg.eigvalsh` only.
+**Largest N: 4096 (realised ⟨N⟩ = 4125); 15.8 s per realisation for `eigvalsh` there**
+(0.02 / 0.19 / 0.72 / 2.63 s at the lower rungs). Total measurement 8.6 min.
+
+### Structural checks (every realisation)
+
+Eigenvalue pairing max |λ_i + λ_{N+1−i}|/λ_max ≤ 8.3e-15. Hilbert–Schmidt identity
+Σλ² = (#relations)/2 to ≤ 1.7e-14 relative — the causet carries exactly the continuum's
+total spectral weight 2(ρL²)² = N²/8 in expectation (E[#relations] = N(N−1)/4).
+
+### G1-A — agreement down to the Sorkin–Yazdi landmark: **PASS**
+
+| N_nom | ⟨N⟩ ± sd | R | m_SY | r̄(1) | r̄(m_SY) | max\|r̄−1\|, m ≤ m_SY |
+|---|---|---|---|---|---|---|
+| 256 | 257.8 ± 16.6 | 320 | 32 | 1.0018 ± 0.0017 | 0.9516 ± 0.0009 | 0.0484 ± 0.0009 |
+| 512 | 514.8 ± 25.9 | 160 | 45 | 1.0004 ± 0.0018 | 0.9761 ± 0.0009 | 0.0239 ± 0.0008 |
+| 1024 | 1027.4 ± 35.3 | 80 | 64 | 1.0032 ± 0.0016 | 0.9889 ± 0.0007 | 0.0114 ± 0.0006 |
+| 2048 | 2062.6 ± 40.6 | 40 | 90 | 1.0006 ± 0.0015 | 0.9944 ± 0.0008 | 0.0062 ± 0.0009 |
+| 4096 | 4124.8 ± 60.7 | 20 | 128 | 0.9977 ± 0.0016 | 0.9967 ± 0.0006 | 0.0043 ± 0.0011 |
+
+Tolerance 0.05. N = 256 passes with only 0.0016 to spare (0.0484): the small-N end is marginal and is
+stated as such. The top eigenvalue agrees with the continuum to ≤ 0.3% at every N.
+
+### G1-B — the knee exists and moves with N: **PASS**
+
+Knee m*(δ) = 1 + last rank with r̄ ≥ 1 − δ (bootstrap SE):
+
+| N_nom | m_SY | δ = 0.02 | δ = 0.05 | **δ = 0.10** | δ = 0.20 |
+|---|---|---|---|---|---|
+| 256 | 32 | 23 ± 0.5 | 33 ± 0.3 | **46 ± 0.3** | 63 ± 0.3 |
+| 512 | 45 | 42 ± 0.9 | 65 ± 0.7 | **90 ± 0.5** | 125 ± 0.6 |
+| 1024 | 64 | 83 ± 1.3 | 127 ± 1.2 | **178 ± 0.7** | 249 ± 1.0 |
+| 2048 | 90 | 164 ± 1.5 | 253 ± 1.3 | **358 ± 1.5** | 500 ± 1.4 |
+| 4096 | 128 | 320 ± 3.6 | 507 ± 2.4 | **714 ± 2.7** | 998 ± 3.3 |
+
+Exponents (OLS on log⟨N⟩, bootstrap SE): m* ∝ N^α with
+α = 0.956 ± 0.008 (δ=0.02), 0.984 ± 0.003 (0.05), **0.990 ± 0.002 (0.10, primary)**, 0.997 ± 0.002 (0.20).
+Primary α is 428σ from 0.
+
+**GATE 1: PASS** (G1-A and G1-B).
+
+### G1-C — comparison with the published landmark: **DISCREPANT (212σ)**
+
+Sorkin–Yazdi (1611.10281 §3, Fig. "spec", one causet, N = 200, ρ = 50) state that causet and
+continuum spectra agree above λ^cs = √N/4π and are "in very poor agreement below it", with a
+"break" there. That landmark scales as m_SY ∝ √N. **Measured: the knee scales as N, not √N,
+at every threshold.** Panel C (r̄ vs m/N) collapses all five N onto one curve; panel B
+(r̄ vs m/√N) fans out. Equivalently the knee sits at a fixed *absolute* causet eigenvalue:
+λ*(δ = 0.1) = 0.800, 0.818, 0.826, 0.824, 0.828 for ⟨N⟩ = 258 … 4125
+(λ* ∝ N^{0.011 ± 0.002} — not exactly flat, 5σ, but within 3% over a 16× range in N).
+
+At SY's landmark itself the agreement *improves* with N: 1 − r̄(m_SY) = 0.048, 0.024, 0.011,
+0.0056, 0.0033 — falling ~1/N. (Observation only, not claimed: (1 − r̄(m_SY))·(√N/4π)² =
+0.079, 0.078, 0.072, 0.073, 0.086 ± 0.016, i.e. consistent with a deviation ∝ 1/λ².)
+
+**Why SY could not see this:** at their N = 200, √N/4π = 1.13 — numerically on top of the
+N-independent O(1) eigenvalue where the roll-off actually begins. A single N cannot separate
+the two scalings; a ladder can.
+
+### What this does and does not mean
+
+- **It refutes, at large N, the *spectral-break* justification for the √N/4π cut** — rank-ordered
+  causet eigenvalues track the continuum to < 0.5% well below the landmark for N ≳ 2000.
+- **It does not refute the SY truncation rule.** SY give a second, independent argument: a cutoff
+  at the discreteness wavelength ρ^{−1/2} converted through the continuum wavelength–eigenvalue
+  relation (1611.10281 §3, "Another way to think of where the √N/4π comes from"). That argument
+  is about *eigenvectors*. This gate compares rank-ordered *eigenvalues* only, and agreement of
+  the counting function says nothing about whether the m-th causet eigenvector resembles the
+  m-th continuum mode — below the discreteness wavelength it plausibly does not. Not tested here.
+- **Consequence for Gate 3:** apply SY's truncation exactly as published (λ̃_min ~ √N/4π, both
+  diamonds). Do not "improve" it by moving the cut to the spectral knee found here — that would be
+  a different prescription and would not be a reproduction. If Gate 3 is sensitive to the cut,
+  that sensitivity must be reported against this finding.
+
+### Honest line
+
+The causet iΔ reproduces the continuum diamond spectrum far deeper than the published landmark
+says, and the place where it stops scales like N, not √N; the gate passes on its pre-set terms,
+and the published "break at √N/4π" does not survive a ladder in N.
