@@ -1391,3 +1391,117 @@ the two scalings; a ladder can.
 The causet iΔ reproduces the continuum diamond spectrum far deeper than the published landmark
 says, and the place where it stops scales like N, not √N; the gate passes on its pre-set terms,
 and the published "break at √N/4π" does not survive a ladder in N.
+
+---
+
+## 2026-10-05 — Phase 3a GATE 2: SJ Wightman function vs the exact continuum W_SJ — **FAIL** (G2-A), published comparison reproduced (G2-B)
+
+- **Branch:** `phase3-sj`
+- **Experiment:** `experiments/exp06_sj_1p1d.py gate2`
+- **Figure:** `figures/exp06_gate2_wightman.png` (4 panels)
+- **Raw data:** `data/exp06_gate2_wightman.npz` (10.5 MB, compressed) — centre-point coordinates and the Re w, Re W_SJ upper triangles (float32) for every realisation; 1.68 M pairs
+- **Seeds:** `20261006 + 100000·i + k`
+- **Library changes:** `src/causet/sj_continuum.py` gains the exact continuum W_SJ,L (`w_box`, `epsilon_matrix`, `w_sj_matrix`, `w_centre`); 8 new tests in `tests/test_sj_continuum.py`
+- **Tests:** `python -m pytest` → **177 passed**
+
+### Source discrepancy found while building the target (sources' own mode sums win)
+
+**ABDRSY 1207.7101 eq. (SJbox), as printed on arXiv, has a sign typo in its two cross terms:**
+it reads `+Log[1 − e^{−iπ(u−v′)/2L}] + Log[1 − e^{−iπ(v−u′)/2L}]`; the correct terms are
+`+Log[1 **+** e^{…}]`. Derivation: with w = e^{−iπa/2}, eq. (firstsum) contributes
+(1/8π)Log(1−w²) and eq. (secondsum) (1/8π)[Log(1+w) − Log(1−w)] per cross term; the sum is
+(1/4π)Log(1+w). Three independent confirmations: (i) brute-force summation of eqs. (sum1) +
+(epsdef) agrees with the corrected form to < 2e-4 at 6 generic pairs, while the printed form
+misses by up to 0.29; (ii) only the corrected form reproduces the paper's own centre limit
+eq. (SJtpcentrecomplete) — the cross terms supply the (1/2π)ln 2 that turns −(1/2π)ln(π/2L) into
+the printed −(1/2π)ln(π/4L); (iii) with it, Im W = Δ/2 holds to 9e-11. Their eq. (47) and all
+downstream results are unaffected; it is a transcription error in the closed form only.
+
+**Published numbers reproduced:** ε(0,0;0,0) = **−0.062723** (converged to 1e-10 in the mode
+count), vs ABDRSY's ε_centre ≈ −0.063. *Correction to my working note:* SSY's μ = 0.0116681
+inverts to ε = −0.06300, i.e. SSY used the rounded value; it carries no extra precision.
+
+### Disclosure
+
+One exploratory realisation (N = 2064, seed 999999, outside the seed range) before the
+criteria were fixed; a smoke run (N ≤ 2048, ≤ 6 realisations, discarded) afterwards. The smoke
+run exposed a power problem in G2-A (below); **the criterion was not changed.**
+
+### Parameters
+
+τ = 1; N_nom ∈ {512, 1024, 2048, 4096}, R = {128, 64, 32, 12}. ABDRSY's centre square
+(|u/L|, |v/L| ≤ √0.08, 8% of the area): 40 / 83 / 166 / 342 points per realisation. Untruncated
+W (no SY cut). Exact continuum W_SJ,L (eq. (47) via W_box + ε, 20 000 g-modes) at the sprinkled
+coordinates. d/ℓ = √(N|ΔūΔv̄|/2), ℓ = ρ^{−1/2}. Residuals averaged within a realisation, then
+across realisations (SE over realisations). **Largest N 4096 (realised ⟨N⟩ = 4131): 105 s per
+realisation for `sj_wightman`** (0.3 / 1.6 / 13.4 s at the lower rungs). Total 35.7 min.
+
+### The measurement — residual Re w − Re W_SJ (timelike; spacelike agrees bin by bin to ≤ 0.0013)
+
+| d/ℓ | N = 512 (R=128) | 1024 (64) | 2048 (32) | 4096 (12) |
+|---|---|---|---|---|
+| [0, 0.25) | −0.1363 ± 0.0034 | −0.1240 ± 0.0029 | −0.1173 ± 0.0029 | −0.1089 ± 0.0029 |
+| [0.25, 0.5) | −0.0502 ± 0.0015 | −0.0472 ± 0.0014 | −0.0430 ± 0.0010 | −0.0405 ± 0.0012 |
+| [0.5, 1) | −0.0170 ± 0.0012 | −0.0169 ± 0.0010 | −0.0170 ± 0.0008 | −0.0175 ± 0.0010 |
+| [1, 2) | −0.0019 ± 0.0011 | −0.0040 ± 0.0011 | −0.0058 ± 0.0007 | −0.0062 ± 0.0011 |
+| [2, 4) | +0.0030 ± 0.0011 | +0.0001 ± 0.0011 | −0.0019 ± 0.0007 | −0.0030 ± 0.0011 |
+| [4, 8) | +0.0035 ± 0.0012 | +0.0014 ± 0.0011 | −0.0007 ± 0.0008 | −0.0020 ± 0.0012 |
+| [8, 16) | +0.0042 ± 0.0031 | +0.0011 ± 0.0012 | −0.0003 ± 0.0009 | −0.0015 ± 0.0014 |
+| [16, 32) | — | — | −0.0000 ± 0.0016 | −0.0019 ± 0.0016 |
+
+For scale: Re W_SJ runs from ≈ 0.35 at d = 2ℓ to ≈ 0.15 at d = 16ℓ.
+
+### Verdicts (pre-registered)
+
+- **G2-B — PASS.** At ABDRSY's N = 2048, every bin with d ≥ 2ℓ satisfies |residual| ≤ 0.02; worst
+  −0.0019. The published claim ("the continuum and discrete SJ Wightman functions approximate each
+  other") is reproduced — against the *exact* W_SJ,L and for spacelike as well as timelike pairs,
+  both stronger than the published comparison (timelike vs W_{M,λ}).
+- **G2-A — FAIL, both characters.** At fixed continuum separation d/L ∈ [0.1, 0.4], the residual
+  R(N) = +0.0016, +0.0004, −0.0010, −0.0019 (timelike; SE 0.0008–0.0013), spacelike alike.
+  |R| ~ N^{+0.02 ± 0.45} (timelike), N^{+0.35 ± 0.51} (spacelike): **no shrinkage is demonstrated.**
+  Fallback not met (|R| < 2 SE at *both* ends).
+- **GATE 2: FAIL.**
+
+### What the failure is, stated precisely
+
+It is **not** a large disagreement. Every far-separation residual is ≤ 0.004 in magnitude (≈ 1%
+of Re W), and no single N shows a window residual beyond 1.6σ from zero. The failure is that
+convergence *to* zero could not be demonstrated, for two reasons visible in the data:
+
+1. **Power.** The residual already sits at the 1e-3 noise floor at the smallest N, so a log-slope
+   test has nothing to grip. This was flagged after the smoke run and deliberately left unfixed.
+2. **A coherent drift through zero, not towards it.** At every far bin the residual moves from
+   ≈ +0.003 (N = 512) to ≈ −0.002 (N = 4096), monotonically, in both characters. **Post-hoc
+   diagnostic (not a criterion, defined after seeing the data):** pooling all pairs with d ≥ 2ℓ,
+   per-realisation residual vs ln N has slope −0.0028 ± 0.0010 per unit ln N (**2.7σ**; −0.0019
+   per doubling), crossing zero near N ≈ 1500. Below 3σ, so not claimed as an effect — but if it is
+   real and continues, the discrete W does not converge to the continuum at fixed d/L; it would
+   carry an offset growing like ln N. That is exactly the shape of an infrared-constant mismatch in
+   a 2d massless theory, and is therefore worth resolving, not dismissing.
+
+### G2-C — short separations (reported)
+
+Discreteness dominates below one discreteness length, as expected: the causet W is **finite and
+below** the log-divergent continuum. Residual −0.017 at d ∈ [ℓ/2, ℓ) — **identical at every N**
+(χ² = 0.2 and 0.7 for 3 dof, timelike/spacelike): a pure function of d/ℓ. Below ℓ/2 the residual
+is −0.04 to −0.14 and **not** a function of d/ℓ alone (χ² 24–40 for 3 dof), shrinking in
+magnitude with N (−0.136 → −0.109 at d < ℓ/4). Not separated here: part of that N-dependence is
+plausibly a binning artefact — the within-bin distribution of d/ℓ shifts with N while Re W varies
+logarithmically across the bin — and part is the far-field drift above. The crossover from
+discreteness-dominated to continuum-like sits at d ≈ 1–2ℓ in every rung.
+
+### What would resolve G2-A (not run; needs a decision)
+
+More realisations at the two largest N: the post-hoc slope has SE 0.0010; reaching 5σ on a
+−0.0028 slope needs SE ≈ 0.0006, i.e. ~3× the realisations — about 30 × 105 s at N = 4096 plus
+60 × 13 s at N = 2048, ≈ 70 min. Independent of that, a probe of *which* modes carry the drift
+(e.g. W rebuilt without the near-zero iΔ modes that Gate 1 shows deviate from the continuum) would
+connect it to Gate 3's truncation question.
+
+### Honest line
+
+The causal-set SJ two-point function matches the exact continuum one to about 1% of its value
+beyond two discreteness lengths, reproducing the published comparison more stringently than it
+was published; but the pre-registered convergence test fails, and there is a 2.7σ hint of a slow
+ln N drift through zero that the run was not powerful enough to confirm or exclude.

@@ -3,6 +3,7 @@
 Reproduce with:
     python experiments/exp06_sj_1p1d.py gate1              # uses the cache
     python experiments/exp06_sj_1p1d.py gate1 --remeasure  # ignores the cache
+    python experiments/exp06_sj_1p1d.py gate2 [--remeasure]
 
 GATE 1 -- the spectrum of iDelta
 ================================
@@ -63,6 +64,60 @@ Cost (measured before the run): one ``eigvalsh`` of the complex Hermitian
 iDelta takes 0.2 s at N = 512, 0.9 s at 1024, 3.8 s at 2048, 19 s at 4096
 (OpenBLAS, 8 threads). Realisation count is preferred over N (as in Phase 2b):
 it halves as N doubles. Largest N = 4096.
+
+GATE 2 -- the two-point function W near the centre of the diamond
+=================================================================
+Produces figures/exp06_gate2_wightman.png and data/exp06_gate2_wightman.npz
+(centre-point coordinates and Re w, Re W_SJ upper triangles, float32, for every
+realisation), and an explicit PASS / FAIL per criterion.
+
+Published claim being tested (ABDRSY 1207.7101 Sec. 5.2, Fig. "fm"; one causet,
+N = 2048, rho = 1, untruncated): in a centre square holding 8% of the diamond's
+area the discrete SJ amplitudes Re w^{ij} of timelike pairs agree with the
+continuum ("the fit is good"), so "the continuum and discrete SJ Wightman
+functions approximate each other". Only the real part carries information:
+Im W = Delta/2 exactly on both sides (Part 1 test; ABDRSY Sec. 4.1).
+
+Continuum target: the EXACT W_SJ,L (``sj_continuum.w_sj_matrix``: eq. (47) =
+W_box + eps, eqs. (SJbox), (corr)), evaluated at the sprinkled coordinates --
+not the centre approximation, and not W_{M,lambda}. The printed eq. (SJbox) has
+a sign typo in its cross terms (see ``sj_continuum.w_box``); the form used is
+the one equal to the paper's own mode sums, checked by brute force in the tests.
+
+Design, FIXED BEFORE THE RUN -- after one disclosed exploratory realisation
+(N = 2064, seed 999999, outside the seed range). It showed residuals ~ -0.007
+(timelike) and ~0 (spacelike) at d/l >= 4, growing to ~ -0.11 at d/l < 0.25.
+---------------------------------------------------------------------------
+* Region: ABDRSY's centre square, |u/L|, |v/L| <= sqrt(CENTRE_AREA_FRAC).
+* Pairs: every distinct pair of sprinkled points in it, split by causal
+  character (timelike / spacelike). Null pairs have measure zero.
+* Residual per pair: Re w_ij - Re W_SJ(X_i, X_j).
+* Separation: proper distance d = L sqrt(2 |du dv|) (ABDRSY Sec. 4.1), in units
+  of the discreteness length l = rho^{-1/2} = 2L/sqrt(N); in scaled
+  coordinates d/l = sqrt(N |du dv| / 2). Fixed bin edges ``G2_BINS``.
+* Statistics: residuals are averaged within each realisation first, then over
+  realisations (pairs within one causet are correlated; realisations are not).
+  Errors are standard errors over realisations.
+
+Criteria, FIXED BEFORE THE RUN
+------------------------------
+G2-A  continuum convergence: for pairs at FIXED continuum separation
+      d/L in G2_WINDOW, the realisation-averaged residual R(N) must shrink with
+      N, separately for timelike and spacelike pairs. PASS for a character iff
+      the WLS slope gamma of log|R| on log N (errors sigma_R/|R|) satisfies
+      -gamma > 3 sigma; OR (fallback for an already-converged residual)
+      |R| < 2 SE at the largest N while |R| > 2 SE at the smallest N.
+G2-B  reproduction of the published comparison at ABDRSY's N = 2048: every
+      separation bin with lower edge d/l >= 2 has |mean residual| <= G2_TOL
+      (0.02), timelike and spacelike. 0.02 is 6-13% of Re W over that range
+      (0.15-0.35) and ~10x below its variation across the range.
+GATE 2 PASSES iff G2-A (both characters) and G2-B.
+G2-C  short separations (reported, not part of PASS): the residual at d/l < 1,
+      its sign, and whether it depends on d/l alone (chi^2 of its spread across
+      N at fixed d/l) -- i.e. whether it is a discreteness effect.
+
+Cost (measured before the run): full ``sj_wightman`` (eigh with vectors + W)
+1.9 s at N = 1024, 15 s at 2048, 114 s at 4096. Largest N = 4096.
 """
 
 from __future__ import annotations
@@ -380,8 +435,293 @@ def make_gate1_figure(an, rbar, rse, m_pt, m_b, alpha_pt, alpha_se, n_mean) -> N
     plt.close(fig)
 
 
+# ============================================================================ #
+# GATE 2
+# ============================================================================ #
+SEED_BASE2 = 20261006
+N_LADDER2 = [512, 1024, 2048, 4096]
+#: Realisations per rung; cost ~ N^3 (114 s per realisation at N = 4096).
+N_REAL2 = [128, 64, 32, 12]
+#: ABDRSY Sec. 5: "Each subregion occupies 8% of the area of the full diamond."
+CENTRE_AREA_FRAC = 0.08
+CENTRE_HALF = float(np.sqrt(CENTRE_AREA_FRAC))  # |u/L|, |v/L| <= this
+#: d/l bin edges (l = rho^{-1/2}).
+G2_BINS = [0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0]
+#: Fixed continuum-separation window for G2-A, in units of L. Spans
+#: d/l ~ 1.1-4.5 at N = 512 and ~3.2-12.8 at N = 4096.
+G2_WINDOW = (0.1, 0.4)
+G2_TOL = 0.02
+G2_REF_N = 2048  # ABDRSY's N
+G2_FAR = 2.0  # G2-B applies to bins with lower edge d/l >= this
+G2_FIELDS = ("ub", "vb", "pt_off", "rew", "reW", "tri_off", "n", "sec")
+
+CACHE2 = ROOT / "data" / "exp06_gate2_wightman.npz"
+FIG2 = ROOT / "figures" / "exp06_gate2_wightman.png"
+
+
+def measure_gate2_rung(i: int) -> dict:
+    n_nom, n_real = N_LADDER2[i], N_REAL2[i]
+    rho = n_nom / (0.5 * TAU * TAU)
+    ub_all, vb_all, rew, rew_c = [], [], [], []
+    pt_off, tri_off, ns, secs = [0], [0], [], []
+    t_rung = time.time()
+    for k in range(n_real):
+        seed = SEED_BASE2 + 100000 * i + k
+        s = sprinkle_diamond_1d(rho, TAU, seed)
+        c = causal_matrix_1d(s.u, s.v)
+        t0 = time.time()
+        w = sj.sj_wightman(sj.pauli_jordan(sj.retarded_green_2d(c)))
+        secs.append(time.time() - t0)
+        ub = sc.scaled_from_sprinkle(s.u, TAU)
+        vb = sc.scaled_from_sprinkle(s.v, TAU)
+        idx = np.nonzero((np.abs(ub) <= CENTRE_HALF) & (np.abs(vb) <= CENTRE_HALF))[0]
+        w_cont = sc.w_sj_matrix(ub[idx], vb[idx])
+        iu = np.triu_indices(idx.size, 1)
+        ub_all.append(ub[idx])
+        vb_all.append(vb[idx])
+        pt_off.append(pt_off[-1] + idx.size)
+        rew.append(w[np.ix_(idx, idx)].real[iu].astype(np.float32))
+        rew_c.append(w_cont.real[iu].astype(np.float32))
+        tri_off.append(tri_off[-1] + iu[0].size)
+        ns.append(s.n)
+    print(f"  N_nom={n_nom:5d}: {n_real} realisations in {time.time() - t_rung:7.1f} s "
+          f"(sj_wightman {np.mean(secs):.1f} s each)", flush=True)
+    return {"ub": np.concatenate(ub_all), "vb": np.concatenate(vb_all),
+            "pt_off": np.array(pt_off), "rew": np.concatenate(rew),
+            "reW": np.concatenate(rew_c), "tri_off": np.array(tri_off),
+            "n": np.array(ns), "sec": np.array(secs)}
+
+
+def gate2_key() -> str:
+    return (f"g2v1|{SEED_BASE2}|{TAU}|{CENTRE_AREA_FRAC}|{sc.EPS_N_MODES}|"
+            + ",".join(f"{a}:{b}" for a, b in zip(N_LADDER2, N_REAL2)))
+
+
+def load_or_measure_gate2(remeasure: bool) -> list[dict]:
+    key = gate2_key()
+    if not remeasure and CACHE2.exists():
+        z = np.load(CACHE2, allow_pickle=False)
+        if str(z["key"]) == key:
+            print(f"Loaded cached measurements from {CACHE2}")
+            return [{f: z[f"{f}_{i}"] for f in G2_FIELDS} for i in range(len(N_LADDER2))]
+        print("Cache present but parameters differ -- remeasuring.")
+    print(f"Measuring {sum(N_REAL2)} realisations over N = {N_LADDER2} ...", flush=True)
+    rows = [measure_gate2_rung(i) for i in range(len(N_LADDER2))]
+    CACHE2.parent.mkdir(exist_ok=True)
+    payload = {"key": np.array(key)}
+    for i, r in enumerate(rows):
+        for f in G2_FIELDS:
+            payload[f"{f}_{i}"] = r[f]
+    np.savez_compressed(CACHE2, **payload)
+    print(f"Saved raw measurements -> {CACHE2}")
+    return rows
+
+
+def realisation_pairs(row: dict, k: int):
+    """Per pair of realisation k: d/l, d/L, timelike?, residual, Re w, Re W_SJ."""
+    a, b = row["pt_off"][k], row["pt_off"][k + 1]
+    ub, vb = row["ub"][a:b], row["vb"][a:b]
+    iu = np.triu_indices(ub.size, 1)
+    dudv = ((ub[:, None] - ub[None, :]) * (vb[:, None] - vb[None, :]))[iu]
+    t0, t1 = row["tri_off"][k], row["tri_off"][k + 1]
+    rw_ = row["rew"][t0:t1].astype(float)
+    rW_ = row["reW"][t0:t1].astype(float)
+    n = row["n"][k]
+    return (np.sqrt(n * np.abs(dudv) / 2.0), np.sqrt(2.0 * np.abs(dudv)), dudv > 0,
+            rw_ - rW_, rw_, rW_)
+
+
+def mean_se(v) -> tuple[float, float, int]:
+    v = np.asarray(v, float)
+    v = v[np.isfinite(v)]
+    if v.size < 2:
+        return (float(v[0]) if v.size else np.nan), np.nan, int(v.size)
+    return float(v.mean()), float(v.std(ddof=1) / np.sqrt(v.size)), int(v.size)
+
+
+def wls_slope(x, y, sy) -> tuple[float, float]:
+    """Slope and SE of y = a + b x weighted by 1/sy^2."""
+    w = 1.0 / np.asarray(sy) ** 2
+    sw, sx, sxx = w.sum(), (w * x).sum(), (w * x * x).sum()
+    sy_, sxy = (w * y).sum(), (w * x * y).sum()
+    den = sw * sxx - sx * sx
+    return float((sw * sxy - sx * sy_) / den), float(np.sqrt(sw / den))
+
+
+def gate2(remeasure: bool) -> None:
+    rows = load_or_measure_gate2(remeasure)
+    edges = np.array(G2_BINS)
+    nb = edges.size - 1
+    chars = ("timelike", "spacelike")
+    binres, win, npairs = [], [], []
+    for row in rows:
+        r_count = row["n"].size
+        br = np.full((r_count, 2, nb), np.nan)
+        wn = np.full((r_count, 2), np.nan)
+        cnt = np.zeros(2, int)
+        for k in range(r_count):
+            dl, dL, tl, res, _, _ = realisation_pairs(row, k)
+            for c, m_c in enumerate((tl, ~tl)):
+                cnt[c] += int(m_c.sum())
+                for j in range(nb):
+                    m = m_c & (dl >= edges[j]) & (dl < edges[j + 1])
+                    if m.any():
+                        br[k, c, j] = res[m].mean()
+                m = m_c & (dL >= G2_WINDOW[0]) & (dL < G2_WINDOW[1])
+                if m.any():
+                    wn[k, c] = res[m].mean()
+        binres.append(br)
+        win.append(wn)
+        npairs.append(cnt)
+
+    print("\nGATE 2 -- Re W near the diamond centre vs exact continuum W_SJ (ABDRSY 1207.7101)")
+    print("=" * 84)
+    for i, row in enumerate(rows):
+        npts = np.diff(row["pt_off"])
+        print(f"  N_nom={N_LADDER2[i]:5d} <N>={row['n'].mean():7.1f}  R={row['n'].size:3d}  "
+              f"centre pts/realisation {npts.mean():6.1f}  pairs: {npairs[i][0]} timelike, "
+              f"{npairs[i][1]} spacelike  sj_wightman {row['sec'].mean():.1f} s")
+
+    tabs = {}
+    for c, name in enumerate(chars):
+        print(f"\n  Residual Re w - Re W_SJ by d/l, {name.upper()} "
+              "(mean +- SE over realisations [R used])")
+        print(f"  {'d/l bin':>13} " + "".join(f"  N_nom={n:<5}               " for n in N_LADDER2))
+        tab = np.full((len(rows), nb, 3), np.nan)
+        for j in range(nb):
+            cells = ""
+            for i in range(len(rows)):
+                m, se, r = mean_se(binres[i][:, c, j])
+                tab[i, j] = (m, se, r)
+                cells += (f"  {m:+.4f}+-{se:.4f} [{r:3d}]   " if r >= 2 else f"  {'--':^24}")
+            print(f"  [{edges[j]:5.2f},{edges[j + 1]:5.2f}) " + cells)
+        tabs[name] = tab
+
+    print(f"\nG2-A: convergence at fixed continuum separation d/L in {G2_WINDOW}")
+    logn = np.log([row["n"].mean() for row in rows])
+    g2a = {}
+    for c, name in enumerate(chars):
+        st = [mean_se(win[i][:, c]) for i in range(len(rows))]
+        r_ = np.array([s_[0] for s_ in st])
+        se_ = np.array([s_[1] for s_ in st])
+        for i in range(len(rows)):
+            sq = np.sqrt(rows[i]["n"].mean()) / 2
+            print(f"  {name:9s} N_nom={N_LADDER2[i]:5d}  (d/l {G2_WINDOW[0] * sq:4.1f}-"
+                  f"{G2_WINDOW[1] * sq:4.1f})  R = {r_[i]:+.5f} +- {se_[i]:.5f}")
+        gam, gse = wls_slope(logn, np.log(np.abs(r_)), se_ / np.abs(r_))
+        primary = (-gam) > 3 * gse
+        fallback = (abs(r_[-1]) < 2 * se_[-1]) and (abs(r_[0]) > 2 * se_[0])
+        g2a[name] = primary or fallback
+        print(f"  {name:9s} |R| ~ N^({gam:+.3f} +- {gse:.3f}) -> "
+              f"{'PASS' if g2a[name] else 'FAIL'} (primary {'met' if primary else 'not met'}; "
+              f"fallback {'met' if fallback else 'not met'})")
+
+    ir = N_LADDER2.index(G2_REF_N)
+    g2b, worst = True, (0.0, "")
+    for name in chars:
+        for j in range(nb):
+            m, _, r = tabs[name][ir, j]
+            if edges[j] >= G2_FAR and r >= 2:
+                if abs(m) > abs(worst[0]):
+                    worst = (m, f"{name} d/l [{edges[j]:g},{edges[j + 1]:g})")
+                g2b &= abs(m) <= G2_TOL
+    print(f"\nG2-B: at N_nom = {G2_REF_N}, every bin with d/l >= {G2_FAR}: |residual| <= "
+          f"{G2_TOL}; worst {worst[0]:+.4f} ({worst[1]}) -> {'PASS' if g2b else 'FAIL'}")
+
+    print("\nG2-C (reported): short separations -- is the residual a function of d/l alone?")
+    for name in chars:
+        for j in range(nb):
+            if edges[j + 1] > 1.0:
+                continue
+            m, se = tabs[name][:, j, 0], tabs[name][:, j, 1]
+            ok = np.isfinite(m) & np.isfinite(se) & (se > 0)
+            if ok.sum() < 2:
+                continue
+            wm = np.sum(m[ok] / se[ok] ** 2) / np.sum(1 / se[ok] ** 2)
+            chi2 = np.sum(((m[ok] - wm) / se[ok]) ** 2)
+            print(f"  {name:9s} d/l [{edges[j]:.2f},{edges[j + 1]:.2f}): weighted mean {wm:+.4f};"
+                  f" chi2 = {chi2:5.1f} for {ok.sum() - 1} dof across N")
+
+    ok_all = g2a["timelike"] and g2a["spacelike"] and g2b
+    print(f"\nGATE 2: {'PASS' if ok_all else 'FAIL'}  (G2-A both characters and G2-B; G2-C reported)")
+    print(f"Largest N used: {N_LADDER2[-1]} (realised <N> = {rows[-1]['n'].mean():.0f}); "
+          f"sj_wightman {rows[-1]['sec'].mean():.0f} s per realisation there.")
+    make_gate2_figure(rows, tabs, win, logn)
+    print(f"Figure -> {FIG2}")
+
+
+def make_gate2_figure(rows, tabs, win, logn) -> None:
+    fig, axes = plt.subplots(1, 4, figsize=(22.0, 5.4))
+    cmap = plt.get_cmap("Blues")
+    cols = [cmap(0.4 + 0.55 * j / (len(rows) - 1)) for j in range(len(rows))]
+    edges = np.array(G2_BINS)
+    mids = np.sqrt(np.maximum(edges[:-1], 0.125) * edges[1:])
+
+    ax = axes[0]
+    ir = N_LADDER2.index(G2_REF_N)
+    dl, _, tl, _, rw_, rW_ = realisation_pairs(rows[ir], 0)
+    # Markers, not a line: W_SJ depends on position as well as on d, so it is
+    # not a single-valued function of d and a d-sorted line would zigzag.
+    ax.plot(dl[tl], rw_[tl], ".", ms=2, color="tab:blue", alpha=0.35,
+            label=f"causet Re w, timelike (N={rows[ir]['n'][0]}, one realisation)")
+    ax.plot(dl[tl], rW_[tl], ".", ms=0.8, color="k", alpha=0.5,
+            label="continuum Re W_SJ at the same pairs")
+    ax.set_xscale("log")
+    ax.set_xlabel("proper separation d / l   (l = rho^-1/2)")
+    ax.set_ylabel("Re W")
+    ax.set_title("A. ABDRSY Fig. 'fm' analogue, centre square (8% of area)\n"
+                 "continuum is the EXACT W_SJ,L, not W_M,lambda", fontsize=9.5)
+    ax.legend(fontsize=7)
+    ax.grid(alpha=0.25, which="both")
+
+    for ax, name in ((axes[1], "timelike"), (axes[2], "spacelike")):
+        for i in range(len(rows)):
+            t = tabs[name][i]
+            ok = t[:, 2] >= 2
+            ax.errorbar(mids[ok], t[ok, 0], yerr=t[ok, 1], fmt="o-", ms=4, capsize=2,
+                        color=cols[i],
+                        label=f"<N>={rows[i]['n'].mean():.0f} (R={rows[i]['n'].size})")
+        ax.axhline(0.0, color="k", lw=1.0, ls=":")
+        ax.axhspan(-G2_TOL, G2_TOL, color="0.88", zorder=0, label=f"+-{G2_TOL} (G2-B band)")
+        ax.axvline(1.0, color="0.5", lw=0.8, ls="--")
+        ax.set_xscale("log")
+        ax.set_xlabel("proper separation d / l   (binned)")
+        ax.set_ylabel("Re w - Re W_SJ   (mean +- SE over realisations)")
+        ax.legend(fontsize=7, loc="lower right")
+        ax.grid(alpha=0.25, which="both")
+    axes[1].set_title("B. Residual vs separation, TIMELIKE pairs\n"
+                      "dashed: one discreteness length", fontsize=9.5)
+    axes[2].set_title("C. Residual vs separation, SPACELIKE pairs", fontsize=9.5)
+
+    ax = axes[3]
+    nmean = np.exp(logn)
+    for c, (name, col, mk) in enumerate((("timelike", "tab:blue", "o"),
+                                         ("spacelike", "tab:orange", "s"))):
+        st = [mean_se(win[i][:, c]) for i in range(len(rows))]
+        ax.errorbar(nmean, [s_[0] for s_ in st], yerr=[s_[1] for s_ in st], fmt=mk + "-",
+                    ms=6, capsize=3, color=col, label=name)
+    ax.axhline(0.0, color="k", lw=1.0, ls=":")
+    ax.set_xscale("log")
+    ax.set_xlabel("<N>")
+    ax.set_ylabel(f"residual averaged over d/L in {G2_WINDOW}")
+    ax.set_title("D. G2-A: convergence at FIXED continuum separation\n"
+                 "(must shrink towards 0 as N grows)", fontsize=9.5)
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.25, which="both")
+
+    fig.suptitle(
+        "Phase 3a GATE 2 -- SJ Wightman function on 1+1 D diamond causets vs exact continuum "
+        f"W_SJ (seeds {SEED_BASE2}+100000 i + k; R = {N_REAL2}; untruncated)",
+        fontsize=10.5,
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.92))
+    FIG2.parent.mkdir(exist_ok=True)
+    fig.savefig(FIG2, dpi=150)
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
-    if not args or args[0] not in ("gate1",):
-        sys.exit("usage: exp06_sj_1p1d.py gate1 [--remeasure]")
-    gate1(remeasure="--remeasure" in args)
+    if not args or args[0] not in ("gate1", "gate2"):
+        sys.exit("usage: exp06_sj_1p1d.py {gate1|gate2} [--remeasure]")
+    {"gate1": gate1, "gate2": gate2}[args[0]](remeasure="--remeasure" in args)
