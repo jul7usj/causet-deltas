@@ -1015,7 +1015,7 @@ def gate2b(remeasure: bool) -> None:
     r_old = [o["n"].size for o in old]
     new = rung_fit(far["full"], logn, sel=[np.arange(r, rows[i]["n"].size)
                                           for i, r in enumerate(r_old)])
-    print(f"    new seeds only (R = {list(new['R'])}): {new['b']:+.5f} +- {new['se']:.5f} "
+    print(f"    new seeds only (R = {[int(r) for r in new['R']]}): {new['b']:+.5f} +- {new['se']:.5f} "
           f"({new['z']:+.2f} sigma)")
     lit = rung_fit(far["full"], logn, sel=[np.arange(r_old[0]), np.arange(r_old[1]),
                                           np.arange(rows[2]["n"].size),
@@ -1082,7 +1082,7 @@ def make_gate2b_figure(rows, logn, prim, sec, new, bins) -> None:
 
     ax = axes[0]
     ax.errorbar(nmean, prim["mu"], yerr=prim["se_rung"], fmt="o", ms=6, capsize=3,
-                color="tab:blue", label=f"all seeds, R={list(prim['R'])}")
+                color="tab:blue", label=f"all seeds, R={[int(r) for r in prim['R']]}")
     ax.errorbar(nmean * 1.04, new["mu"], yerr=new["se_rung"], fmt="o", mfc="none", ms=6,
                 capsize=3, color="tab:blue", alpha=0.6, label="new seeds only")
     ax.plot(np.exp(xx), prim["a"] + prim["b"] * xx, color="tab:blue", lw=1.2,

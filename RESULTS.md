@@ -1409,6 +1409,10 @@ eigenvalues track the continuum to within 10% out to rank ≈ 0.17 N (714). If t
 criterion follows the same knee, the linear truncation keeps a number of modes ∝ N, and the two
 prescriptions diverge by a factor ∝ √N, about 5–6 at N ≈ 4100. Whether the SXY criterion does
 scale like this ratio knee is a pre-registered measurement (g1lin, entry of 2026-11-02 below).
+**Measured (entry of 2026-11-03): n_lin ∝ N^{0.959 ± 0.004}.** By the pre-registered rule this
+reads "neither" (9σ from 1), but n_lin/N levels off at ≈ 0.118 for N ≳ 1000. The two truncations
+nearly coincide at N ≈ 258 (34 vs 30 modes) and diverge to 486 vs 128 at N ≈ 4100, a factor 3.8.
+The SXY knee fires earlier than the 10% ratio knee.
 The eigenvalues alone cannot say which truncation is right. The √N cut's justification is about
 eigenvectors and wavelengths, and KMY's eigenvector transition ∝ N^{0.46 ± 0.04} supports it
 directly (N ≤ 2200, one method). The eigenvalue knee measured here shows only that the
@@ -1701,3 +1705,142 @@ seed 77, 2000 resamples), with n_SY alongside. The reading is fixed now:
 - otherwise "neither".
 
 Reported only; no gate.
+
+---
+
+## 2026-11-03 — Phase 3a GATE 2 FOLLOW-UP: RESULTS — PRIMARY VERDICT: **CONVERGENCE** (no drift; the bound is met only by the pre-registered statistic)
+
+- **Branch:** `phase3-sj`; pre-registration `756b23f` committed before any of these data existed
+- **Raw data:** `data/exp06_gate2b_N{512,1024,2048,4096}.npz` (5.5 / 10.1 / 18.7 / 27.7 MB). Per
+  realisation: centre-point coordinates, the positive iΔ spectrum, n_SY, n_lin, and Re w
+  (untruncated, SY, LIN) and Re W_SJ upper triangles in float32. The truncated continuum is
+  recomputed in the analysis from these.
+- **Figures:** `figures/exp06_gate2b_drift.png`, `figures/exp06_g1lin_truncation.png`
+- **Cost:** 6795 s of measurement (113 min). eigh + W took 0.2 / 1.4 / 15.3 / 113 s per realisation
+  at ⟨N⟩ = 514 / 1025 / 2051 / 4120. Largest N 4096 (realised ⟨N⟩ = 4120).
+- **Reproduction check: PASS.** All 236 regenerated Gate 2 realisations have the same N and
+  reproduce the cached Re w **bit for bit** (max |Δ| = 0).
+- **Post-run change, display only:** a label printed `np.int64(384)`; fixed to `int`, and the
+  analysis was rerun from cache. Output is identical apart from that label.
+
+### PRIMARY — untruncated W, pooled far pairs (d ≥ 2ℓ), WLS on rung means
+
+| N_nom | ⟨N⟩ | R | far residual Re w − Re W_SJ |
+|---|---|---|---|
+| 512 | 513.8 | 384 | +0.00157 ± 0.00056 |
+| 1024 | 1025.1 | 192 | +0.00016 ± 0.00056 |
+| 2048 | 2051.1 | 96 | +0.00084 ± 0.00051 |
+| 4096 | 4120.4 | 36 | +0.00055 ± 0.00074 |
+
+**b = −0.00037 ± 0.00045 per unit ln N** (|b|/SE = 0.82; χ² = 2.48 for 2 dof, Birge factor 1.11).
+DRIFT is not met (needs 5). CONVERGENCE is met: |b| + 2SE = **0.00126 ≤ 0.0015**, with a margin of
+0.00024. **Verdict: CONVERGENCE.** The ln N drift of the far residual is bounded by
+|b| < 0.0015 per unit ln N at 95%.
+
+**What is robust and what is not.** The pre-registered alternatives, run on the same data:
+
+| form | b (per ln N) | \|b\|/SE | \|b\| + 2SE | would read |
+|---|---|---|---|---|
+| **pre-registered (WLS, all seeds, 3× every rung)** | **−0.00037 ± 0.00045** | **0.82** | **0.00126** | **CONVERGENCE** |
+| OLS on realisations (Gate 2's post-hoc form) | −0.00067 ± 0.00056 | 1.19 | 0.00179 | UNRESOLVED |
+| brief's literal design (Gate 2 R at 512, 1024) | −0.00100 ± 0.00057 | 1.76 | 0.00214 | UNRESOLVED |
+| new seeds only (R = 256, 128, 64, 24) | **+0.00073** ± 0.00057 | 1.28 | 0.00187 | UNRESOLVED |
+| timelike only | −0.00033 ± 0.00042 | 0.78 | 0.00117 | CONVERGENCE |
+| spacelike only | −0.00021 ± 0.00042 | 0.51 | 0.00105 | CONVERGENCE |
+| *Gate 2's seeds only (the hint, WLS)* | *−0.00259 ± 0.00070* | *3.70* | — | — |
+
+- **No form detects drift.** The largest is 1.76σ, against a threshold of 5.
+- **The 0.0015 bound is not robust.** It is met by the pre-registered statistic (and by each
+  causal character separately). It is *not* met under Gate 2's OLS form, nor under the brief's
+  literal design, nor by the new seeds alone. Those would read UNRESOLVED, because their SEs are
+  larger, not because they show drift. The verdict therefore depends on the pre-registered
+  decision to triple the two cheap rungs.
+- **The hint did not replicate.** The 236 old realisations are reproduced exactly. The new
+  realisations at the two largest N sit higher: the rung means move from −0.0009 / −0.0021
+  (Gate 2) to +0.0008 / +0.0006 (all seeds). The new seeds alone give a slope of the *opposite*
+  sign. The 2.7σ post-hoc hint is consistent with a fluctuation in Gate 2's 32 + 12 realisations
+  at N = 2048, 4096, of the winner's-curse kind flagged in the pre-registration.
+- **Constant offset (reported, not graded).** The far residual's weighted mean over rungs is
+  +0.0008 ± 0.0003, about 0.2–0.5% of Re W across the far range. At N = 4120 every bin beyond 2ℓ
+  is within ±0.0009, which is ≤ 1.2 SE.
+- **Gate 2's recorded verdict is not changed.** G2-A FAIL stands: it was a pre-registered
+  shrinkage test on Gate 2's own data. This follow-up answers the question that failure left open.
+
+### SECONDARY — data only (the primary found no drift, so no mechanistic interpretation)
+
+Same eigendecompositions. Slopes per unit ln N, by WLS/Birge on rung means:
+
+| series | rung means (512 → 4096) | b |
+|---|---|---|
+| SY vs rank-matched truncated continuum | +0.00156, +0.00009, +0.00071, +0.00043 | −0.00043 ± 0.00045 |
+| LIN vs rank-matched truncated continuum | +0.00142, +0.00007, +0.00079, +0.00052 | −0.00030 ± 0.00044 |
+| SY vs exact W_SJ | +0.0010, −0.0002, +0.0009, +0.0008 | +0.00005 ± 0.00046 |
+| LIN vs exact W_SJ | +0.00121, −0.00001, +0.00075, +0.00050 | −0.00021 ± 0.00042 |
+| D_SY = full − SY (matched) | +0.000008, +0.000071, +0.000125, +0.000117 | +0.000040 ± 0.000023 |
+| D_LIN = full − LIN (matched) | +0.000152, +0.000095, +0.000053, +0.000023 | −0.000046 ± 0.000005 |
+
+Beyond 2ℓ, truncation changes the pooled far residual by ≤ 1.5 × 10⁻⁴, below the per-rung SE
+(5–7 × 10⁻⁴). D_LIN's slope is 9σ from zero but has magnitude 5 × 10⁻⁵ per ln N, about a tenth of the
+primary's SE.
+
+Per bin at ⟨N⟩ = 4120 (R = 36), residual vs the matching continuum target:
+
+| d/ℓ | untruncated vs exact | SY vs matched | LIN vs matched |
+|---|---|---|---|
+| [0, 0.25) | −0.1057 ± 0.0014 | −0.0050 ± 0.0005 | −0.0253 ± 0.0006 |
+| [0.25, 0.5) | −0.0388 ± 0.0006 | −0.0061 ± 0.0005 | −0.0239 ± 0.0006 |
+| [0.5, 1) | −0.0142 ± 0.0006 | −0.0064 ± 0.0006 | −0.0167 ± 0.0007 |
+| [1, 2) | −0.0039 ± 0.0007 | −0.0049 ± 0.0007 | −0.0046 ± 0.0007 |
+| [2, 4) | −0.0004 ± 0.0007 | −0.0007 ± 0.0007 | −0.0004 ± 0.0007 |
+| [4, 32) | +0.0006 … +0.0009 (± 0.0008) | same to 1e-4 | same to 1e-4 |
+
+Below one discreteness length the truncated causet W tracks the *equally truncated* continuum
+far more closely than the untruncated pair agree; above 2ℓ all three are indistinguishable. Data
+only. Note that "matched" targets differ between columns, so the columns are not comparisons of
+one causet W against one target.
+
+Kept modes: n_SY = 43.8, 62.8, 89.5, 127.6 (∝ N^0.513); n_lin = 62.6, 122.1, 244.5, 485.6
+(∝ N^0.986; per-realisation sd 8.6 → 20.4).
+
+### `g1lin` — linear truncation on Gate 1's spectra (pre-registered; reported only)
+
+620 realisations, ⟨N⟩ = 258 … 4125. n_lin = 34.0, 64.2, 122.1, 243.8, 485.6 (SE 0.4–4.2):
+**β = 0.959 ± 0.004.** The pre-registered reading is **"neither"**: 104σ from ½ and 9.1σ from 1.
+Descriptively, n_lin/⟨N⟩ = 0.132, 0.125, 0.119, 0.118, 0.118, flat from N ≈ 1000, while
+n_lin/√N grows 2.1 → 7.6. The sub-unit exponent comes from the two lowest rungs; that is not
+claimed as a law.
+
+Against the published truncations:
+
+- n_SY = 30.2 … 127.7 (∝ N^{0.519 ± 0.001}).
+- The two coincide at N ≈ 258 (34 vs 30 modes) and diverge to **486 vs 128 at N ≈ 4125**.
+- n_lin lies between Gate 1's ratio knees m*(0.02) = 320 and m*(0.05) = 507. The SXY slope
+  criterion with δ = 0.1 fires before the 10% ratio knee (714).
+- The first-crossing diagnostic is noise-dominated: mean 3.4 → 169, with sd comparable to the
+  mean at N ≥ 1000. That justifies the one-sided rule; the diagnostic is not used.
+
+### Honest line
+
+The far-separation residual of the causal-set SJ W does not drift with ln N. No analysis form
+detects drift (≤ 1.8σ), and the post-hoc 2.7σ hint reverses sign in new realisations. Under the
+pre-registered statistic, the drift is bounded below 0.0015 per unit ln N at 95%. That bound
+holds only under the pre-registered design and estimator; Gate 2's OLS form or the brief's
+literal design would leave it unresolved. The mechanism test was not triggered, and its numbers
+are reported as data: truncation (SY or SXY) moves the far residual by ≤ 1.5 × 10⁻⁴. The SXY
+linear truncation keeps ≈ 0.12 N modes against SY's ≈ 2√N. The two published truncations
+coincide only at the smallest N studied.
+
+### Data availability
+
+The four raw-data files for this entry are held outside git because their
+combined size (~62 MB) exceeded what could be pushed reliably over the
+author's connection; per the project's data rule, files over ~20 MB are
+distributed separately (GitHub Release asset, to be uploaded) and verified
+by SHA-256. All four are regenerable from the seeds recorded above.
+
+| File | Size (bytes) | SHA-256 |
+|---|---|---|
+| data/exp06_gate2b_N512.npz  |  5476456 | D95E7D4E562BD9140C79268367A6BA58F2A60AC33E2E6D0273D4ADD46555BEE9 |
+| data/exp06_gate2b_N1024.npz | 10119659 | 2EC91EE9B68FF79FD2D514E83822A91A2B422D6F36351A0890A11DA378C83511 |
+| data/exp06_gate2b_N2048.npz | 18715323 | BC7CDA8A30FEFE0FA32D9DB2D93A9C7CAA56A7F33FB91CBFADED615F27CE12C7 |
+| data/exp06_gate2b_N4096.npz | 27669342 | 6E046F6389267D0793340CBD62E4FD79388E877DEE8953841E1DCAEE0A024AE9 |
