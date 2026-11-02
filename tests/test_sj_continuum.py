@@ -153,3 +153,26 @@ def test_scaled_coordinates_map_diamond():
     tau = 1.7
     assert np.allclose(sc.scaled_from_sprinkle(np.array([0.0, tau / 2, tau]), tau),
                        [-1.0, 0.0, 1.0])
+
+
+def test_truncated_mode_sum_matches_brute_force(brute_modes):
+    """w_sj_modes(n) = eq. (47) summed over the n smallest merged x (both families)."""
+    n, x = brute_modes
+    n_keep = 37
+    xs = sc.diamond_spectrum_x(n_keep)
+    w = sc.w_sj_modes(PTS_A[:, 0], PTS_A[:, 1], PTS_B[:, 0], PTS_B[:, 1], n_modes=n_keep)
+    kf = n * np.pi
+    for i, (u, v) in enumerate(PTS_A):
+        u2, v2 = PTS_B[i]
+        mf, mg = kf <= xs[-1] + 1e-9, x <= xs[-1] + 1e-9
+        s1 = np.sum(_f(kf[mf], u, v) * np.conj(_f(kf[mf], u2, v2)) / (8 * kf[mf]))
+        s2 = np.sum(_g(x[mg], u, v) * np.conj(_g(x[mg], u2, v2))
+                    / (x[mg] * (8 - 16 * np.cos(x[mg]) ** 2)))
+        assert mf.sum() + mg.sum() == n_keep
+        assert abs(w[i, i] - (s1 + s2)) < 1e-12
+
+
+def test_truncated_mode_sum_converges_to_exact():
+    w_exact = sc.w_sj_matrix(PTS_A[:, 0], PTS_A[:, 1], PTS_B[:, 0], PTS_B[:, 1])
+    w_t = sc.w_sj_modes(PTS_A[:, 0], PTS_A[:, 1], PTS_B[:, 0], PTS_B[:, 1], n_modes=100_000)
+    assert np.max(np.abs(w_t - w_exact)) < 5e-4

@@ -186,6 +186,33 @@ def w_sj_matrix(ub, vb, ub2=None, vb2=None, **kw) -> np.ndarray:
     return box + epsilon_matrix(ub, vb, ub2, vb2, **kw)
 
 
+def w_sj_modes(ub, vb, ub2=None, vb2=None, *, n_modes: int) -> np.ndarray:
+    """Continuum W_SJ,L truncated to its ``n_modes`` largest positive eigenvalues.
+
+    ABDRSY eq. (47) summed over the first ``n_modes`` elements of the merged
+    spectrum ``diamond_spectrum_x`` (both families, ascending x = kL), with the
+    per-mode weights of ``epsilon_matrix``: f-family ``(L/k)/||f_k||^2 =
+    1/(8x)``, g-family ``1/(x (8 - 16 cos^2 x))``. Rank-matched counterpart of a
+    causet W that keeps its top ``n_modes`` modes (Gate 2 follow-up control).
+    Converges to ``w_sj_matrix`` as ``n_modes`` grows (error O(1/n_modes)).
+    """
+    ub = np.atleast_1d(np.asarray(ub, float))
+    vb = np.atleast_1d(np.asarray(vb, float))
+    ub2 = ub if ub2 is None else np.atleast_1d(np.asarray(ub2, float))
+    vb2 = vb if vb2 is None else np.atleast_1d(np.asarray(vb2, float))
+    xf = np.pi * np.arange(1, n_modes + 1)
+    xg = tan_2x_roots(n_modes)
+    is_g = np.r_[np.zeros(n_modes, bool), np.ones(n_modes, bool)]
+    order = np.argsort(np.r_[xf, xg], kind="stable")[:n_modes]
+    x, g = np.r_[xf, xg][order], is_g[order]
+    xf, xg = x[~g], x[g]
+    af = np.exp(-1j * np.outer(ub, xf)) - np.exp(-1j * np.outer(vb, xf))
+    bf = np.exp(-1j * np.outer(ub2, xf)) - np.exp(-1j * np.outer(vb2, xf))
+    wg = 1.0 / (xg * (8.0 - 16.0 * np.cos(xg) ** 2))
+    return ((af / (8.0 * xf)) @ bf.conj().T
+            + (_g_modes(xg, ub, vb) * wg) @ _g_modes(xg, ub2, vb2).conj().T)
+
+
 def w_centre(ub, vb, ub2, vb2, l_half: float, eps_c: float = EPS_CENTRE_ABDRSY):
     """ABDRSY eq. (SJtpcentrecomplete), the large-L centre limit, in scaled coords.
 

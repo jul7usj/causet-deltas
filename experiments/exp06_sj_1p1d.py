@@ -4,6 +4,8 @@ Reproduce with:
     python experiments/exp06_sj_1p1d.py gate1              # uses the cache
     python experiments/exp06_sj_1p1d.py gate1 --remeasure  # ignores the cache
     python experiments/exp06_sj_1p1d.py gate2 [--remeasure]
+    python experiments/exp06_sj_1p1d.py gate2b [--remeasure]   # Gate 2 follow-up
+    python experiments/exp06_sj_1p1d.py g1lin                  # linear truncation on Gate 1 spectra
 
 GATE 1 -- the spectrum of iDelta
 ================================
@@ -118,6 +120,46 @@ G2-C  short separations (reported, not part of PASS): the residual at d/l < 1,
 
 Cost (measured before the run): full ``sj_wightman`` (eigh with vectors + W)
 1.9 s at N = 1024, 15 s at 2048, 114 s at 4096. Largest N = 4096.
+
+GATE 2 FOLLOW-UP (gate2b) -- does the far-separation residual drift with ln N?
+==============================================================================
+Pre-registered in RESULTS.md (entry 2026-11-02) and committed BEFORE any of
+these data were generated. Gate 2's post-hoc hint: pooled far-pair residual
+slope -0.0028 +- 0.0010 per unit ln N (2.7 sigma, OLS, not claimed).
+
+Data: the Gate 2 ladder and seed scheme, 3x the realisations at EVERY rung
+(R = 384, 192, 96, 36; seeds ``SEED_BASE2 + 100000 i + k``). The first Gate-2
+R seeds of each rung are Gate 2's own realisations, regenerated; their
+untruncated Re w must reproduce the cached Gate 2 values (``G2B_REPRO_TOL``).
+From ONE eigendecomposition per realisation, three W's on the centre square:
+untruncated; Sorkin--Yazdi cut (keep lambda >= sqrt(N)/4pi); SXY linear
+truncation (``sj.linear_truncation_rank``). Continuum targets: exact W_SJ and
+the rank-matched truncated continuum (``sj_continuum.w_sj_modes``, same number
+of kept modes as the causet W in that realisation).
+
+Statistic: per realisation, the mean residual over ALL pairs (timelike and
+spacelike) with d/l >= ``G2B_FAR``; per rung, mean and SE over realisations;
+slope b in ln<N> by inverse-variance WLS on the four rung means, SE inflated by
+the Birge ratio max(1, sqrt(chi2/2)).
+
+PRIMARY (untruncated W vs exact W_SJ):
+  DRIFT        |b| / SE >= ``DRIFT_Z`` (5).
+  CONVERGENCE  |b| + ``CONV_Z`` SE <= ``CONV_BOUND`` (0.0015 per unit ln N).
+  UNRESOLVED   otherwise. (If both held, DRIFT is reported, with the bound.)
+SECONDARY (interpreted ONLY if PRIMARY = DRIFT), per truncation T, using the
+rank-matched continuum control: residual_T = Re w_T - Re W_SJ,T; paired
+removed-mode drift D_T = slope of (residual_full - residual_T).
+  CARRIED      |b_T|/SE < ``MECH_Z_ZERO`` (2) and D_T has b's sign with
+               |D_T|/SE >= ``MECH_Z_CARRIED`` (3).
+  NOT CARRIED  |b_T|/SE >= ``MECH_Z_CARRIED`` with b's sign.
+  INCONCLUSIVE otherwise.
+Reported, not decisive: Re w_T vs the UNtruncated W_SJ (the comparison as
+first specified; contains the truncation's own N-dependent artefact); OLS on
+realisations (Gate 2's post-hoc form); new-seeds-only slope; the literal
+design (Gate 2's R at N = 512, 1024); timelike / spacelike separately.
+
+Cost (Gate 2 timings): eigh with vectors ~0.3 / 1.6 / 13 / 100 s per
+realisation at N = 512 ... 4096; ~80 min total. Checkpointed per realisation.
 """
 
 from __future__ import annotations
@@ -720,8 +762,469 @@ def make_gate2_figure(rows, tabs, win, logn) -> None:
     plt.close(fig)
 
 
+# ============================================================================ #
+# GATE 2 FOLLOW-UP (gate2b): drift of the far residual; truncation mechanism
+# ============================================================================ #
+#: 3x Gate 2's realisations at every rung (Gate 2's own seeds are the first R).
+N_REAL2B = [3 * r for r in N_REAL2]
+#: Far pairs: proper separation d >= G2B_FAR discreteness lengths.
+G2B_FAR = 2.0
+#: PRIMARY thresholds (pre-registered 2026-11-02).
+DRIFT_Z = 5.0
+CONV_BOUND = 0.0015   # per unit ln N
+CONV_Z = 2.0
+#: SECONDARY (mechanism) thresholds.
+MECH_Z_ZERO = 2.0
+MECH_Z_CARRIED = 3.0
+#: Regenerated Gate 2 realisations must reproduce the cached Re w (float32).
+G2B_REPRO_TOL = 1e-5
+G2B_FIELDS = ("ub", "vb", "pt_off", "tri_off", "n", "sec", "ev", "n_sy", "n_lin",
+              "n_lin_first", "rew", "rew_sy", "rew_lin", "reW")
+G2B_SERIES = ("full", "sy_b", "lin_b", "sy_a", "lin_a")
+
+FIG2B = ROOT / "figures" / "exp06_gate2b_drift.png"
+FIG1L = ROOT / "figures" / "exp06_g1lin_truncation.png"
+
+
+def cache2b(i: int) -> Path:
+    return ROOT / "data" / f"exp06_gate2b_N{N_LADDER2[i]}.npz"
+
+
+def gate2b_key(i: int) -> str:
+    return (f"g2bv1|{SEED_BASE2}|{TAU}|{CENTRE_AREA_FRAC}|{sc.EPS_N_MODES}|{N_LADDER2[i]}:"
+            f"{N_REAL2B[i]}|lin:{sj.LIN_DELTA},{sj.LIN_PLATEAU_SLOPE},"
+            f"{sj.LIN_BINS_PER_DECADE},{sj.LIN_FIRST_RANK}")
+
+
+def _pack(recs: list[dict]) -> dict:
+    """Concatenate per-realisation records into the flat on-disk layout."""
+    width = max(r["ev"].size for r in recs)
+    ev = np.full((len(recs), width), np.nan)
+    for k, r in enumerate(recs):
+        ev[k, : r["ev"].size] = r["ev"]
+    cat = {f: np.concatenate([r[f] for r in recs]) for f in ("ub", "vb", "rew", "rew_sy",
+                                                              "rew_lin", "reW")}
+    npt = [r["ub"].size for r in recs]
+    ntr = [r["rew"].size for r in recs]
+    return {**cat, "ev": ev,
+            "pt_off": np.r_[0, np.cumsum(npt)], "tri_off": np.r_[0, np.cumsum(ntr)],
+            **{f: np.array([r[f] for r in recs]) for f in ("n", "sec", "n_sy", "n_lin",
+                                                           "n_lin_first")}}
+
+
+def _unpack(z, k: int) -> dict:
+    a, b = z["pt_off"][k], z["pt_off"][k + 1]
+    t0, t1 = z["tri_off"][k], z["tri_off"][k + 1]
+    ev = z["ev"][k]
+    return {"ub": z["ub"][a:b], "vb": z["vb"][a:b], "ev": ev[np.isfinite(ev)],
+            **{f: z[f][t0:t1] for f in ("rew", "rew_sy", "rew_lin", "reW")},
+            **{f: z[f][k] for f in ("n", "sec", "n_sy", "n_lin", "n_lin_first")}}
+
+
+def measure_gate2b_realisation(i: int, k: int) -> dict:
+    n_nom = N_LADDER2[i]
+    rho = n_nom / (0.5 * TAU * TAU)
+    s = sprinkle_diamond_1d(rho, TAU, SEED_BASE2 + 100000 * i + k)
+    c = causal_matrix_1d(s.u, s.v)
+    t0 = time.time()
+    evals, evecs = sj.pauli_jordan_spectrum(sj.pauli_jordan(sj.retarded_green_2d(c)))
+    pos = np.nonzero(evals > sj.zero_tolerance(evals, s.n))[0][::-1]   # descending
+    lam, vec = evals[pos], evecs[:, pos]
+    n_sy = sj.sy_truncation_rank(lam, s.n)
+    n_lin, diag = sj.linear_truncation_rank(lam, return_diagnostics=True)
+    ub = sc.scaled_from_sprinkle(s.u, TAU)
+    vb = sc.scaled_from_sprinkle(s.v, TAU)
+    idx = np.nonzero((np.abs(ub) <= CENTRE_HALF) & (np.abs(vb) <= CENTRE_HALF))[0]
+    iu = np.triu_indices(idx.size, 1)
+    blk = {key: sj.wightman_block(lam, vec, idx, nk).real[iu].astype(np.float32)
+           for key, nk in (("rew", None), ("rew_sy", n_sy), ("rew_lin", n_lin))}
+    sec = time.time() - t0
+    w_cont = sc.w_sj_matrix(ub[idx], vb[idx])
+    return {"ub": ub[idx], "vb": vb[idx], "ev": lam, "n": s.n, "sec": sec, "n_sy": n_sy,
+            "n_lin": n_lin, "n_lin_first": diag["n_first_crossing"], **blk,
+            "reW": w_cont.real[iu].astype(np.float32)}
+
+
+def load_or_measure_gate2b(remeasure: bool) -> list[dict]:
+    rows = []
+    for i in range(len(N_LADDER2)):
+        path, part = cache2b(i), cache2b(i).with_suffix(".partial.npz")
+        key = gate2b_key(i)
+        if not remeasure and path.exists():
+            z = np.load(path, allow_pickle=False)
+            if str(z["key"]) == key:
+                print(f"Loaded {path.name}")
+                rows.append({f: z[f] for f in G2B_FIELDS})
+                continue
+            print(f"{path.name}: parameters differ -- remeasuring.")
+        recs = []
+        if not remeasure and part.exists():
+            z = np.load(part, allow_pickle=False)
+            if str(z["key"]) == key:
+                recs = [_unpack(z, k) for k in range(z["n"].size)]
+                print(f"  N_nom={N_LADDER2[i]}: resuming at realisation {len(recs)}")
+        t_rung = time.time()
+        for k in range(len(recs), N_REAL2B[i]):
+            recs.append(measure_gate2b_realisation(i, k))
+            if N_LADDER2[i] >= 2048 or k == N_REAL2B[i] - 1:
+                np.savez(part, key=np.array(key), **_pack(recs))
+            if N_LADDER2[i] >= 2048:
+                print(f"    N_nom={N_LADDER2[i]} k={k:3d}  N={recs[-1]['n']}  "
+                      f"{recs[-1]['sec']:.1f} s  n_SY={recs[-1]['n_sy']}  "
+                      f"n_lin={recs[-1]['n_lin']}", flush=True)
+        print(f"  N_nom={N_LADDER2[i]:5d}: {N_REAL2B[i]} realisations, "
+              f"{time.time() - t_rung:7.1f} s this session", flush=True)
+        packed = _pack(recs)
+        np.savez_compressed(path, key=np.array(key), **packed)
+        part.unlink(missing_ok=True)
+        rows.append(packed)
+    return rows
+
+
+def g2b_pairs(row: dict, k: int) -> dict:
+    """Per pair of realisation k: d/l, timelike?, and the five residual series."""
+    a, b = row["pt_off"][k], row["pt_off"][k + 1]
+    ub, vb = row["ub"][a:b].astype(float), row["vb"][a:b].astype(float)
+    iu = np.triu_indices(ub.size, 1)
+    dudv = ((ub[:, None] - ub[None, :]) * (vb[:, None] - vb[None, :]))[iu]
+    t0, t1 = row["tri_off"][k], row["tri_off"][k + 1]
+    g = {f: row[f][t0:t1].astype(float) for f in ("rew", "rew_sy", "rew_lin", "reW")}
+    w_sy = sc.w_sj_modes(ub, vb, n_modes=int(row["n_sy"][k])).real[iu]
+    w_lin = sc.w_sj_modes(ub, vb, n_modes=int(row["n_lin"][k])).real[iu]
+    return {"dl": np.sqrt(row["n"][k] * np.abs(dudv) / 2.0), "tl": dudv > 0,
+            "full": g["rew"] - g["reW"],
+            "sy_a": g["rew_sy"] - g["reW"], "lin_a": g["rew_lin"] - g["reW"],
+            "sy_b": g["rew_sy"] - w_sy, "lin_b": g["rew_lin"] - w_lin}
+
+
+def wls_fit(x, y, sy) -> dict:
+    """y = a + b x by inverse-variance WLS; SE(b) inflated by the Birge ratio."""
+    x, y, sy = (np.asarray(v, float) for v in (x, y, sy))
+    w = 1.0 / sy**2
+    sw, sx, sxx = w.sum(), (w * x).sum(), (w * x * x).sum()
+    sy_, sxy = (w * y).sum(), (w * x * y).sum()
+    den = sw * sxx - sx * sx
+    b = (sw * sxy - sx * sy_) / den
+    a = (sy_ - b * sx) / sw
+    chi2 = float(np.sum(w * (y - a - b * x) ** 2))
+    birge = max(1.0, np.sqrt(chi2 / (x.size - 2)))
+    se = float(np.sqrt(sw / den)) * birge
+    return {"a": float(a), "b": float(b), "se": se, "z": float(b / se), "chi2": chi2,
+            "birge": birge}
+
+
+def rung_fit(per_real: list[np.ndarray], logn: np.ndarray, sel=None) -> dict:
+    """WLS drift fit on rung means of per-realisation values (optional subset)."""
+    vals = [v if sel is None else v[sel[i]] for i, v in enumerate(per_real)]
+    mu = np.array([v.mean() for v in vals])
+    se = np.array([v.std(ddof=1) / np.sqrt(v.size) for v in vals])
+    out = wls_fit(logn, mu, se)
+    out.update(mu=mu, se_rung=se, R=np.array([v.size for v in vals]))
+    return out
+
+
+def ols_realisations(per_real: list[np.ndarray], lnn_real: list[np.ndarray]) -> tuple:
+    """Gate 2's post-hoc form: OLS of per-realisation values on ln N_k."""
+    x, y = np.concatenate(lnn_real), np.concatenate(per_real)
+    A = np.c_[np.ones_like(x), x]
+    coef, *_ = np.linalg.lstsq(A, y, rcond=None)
+    r = y - A @ coef
+    cov = (r @ r / (y.size - 2)) * np.linalg.inv(A.T @ A)
+    return float(coef[1]), float(np.sqrt(cov[1, 1]))
+
+
+def gate2b(remeasure: bool) -> None:
+    rows = load_or_measure_gate2b(remeasure)
+    logn = np.log([row["n"].mean() for row in rows])
+    edges = np.array(G2_BINS)
+    nb = edges.size - 1
+
+    # ---- reproduction of Gate 2's realisations (untruncated Re w) ----------
+    old = load_or_measure_gate2(False)
+    repro = []
+    for i, (row, o) in enumerate(zip(rows, old)):
+        r_old = o["n"].size
+        same_n = np.array_equal(row["n"][:r_old], o["n"])
+        t1 = row["tri_off"][r_old]
+        dmax = float(np.max(np.abs(row["rew"][:t1].astype(float) - o["rew"].astype(float))))
+        repro.append((N_LADDER2[i], r_old, same_n, dmax))
+
+    # ---- per-realisation far means and per-bin means ------------------------
+    far = {s_: [] for s_ in G2B_SERIES + ("full_tl", "full_sl", "diff_sy", "diff_lin")}
+    bins = []
+    for row in rows:
+        r_count = row["n"].size
+        f_ = {s_: np.empty(r_count) for s_ in far}
+        br = np.full((r_count, 3, nb), np.nan)
+        for k in range(r_count):
+            p = g2b_pairs(row, k)
+            m = p["dl"] >= G2B_FAR
+            for s_ in G2B_SERIES:
+                f_[s_][k] = p[s_][m].mean()
+            f_["full_tl"][k] = p["full"][m & p["tl"]].mean()
+            f_["full_sl"][k] = p["full"][m & ~p["tl"]].mean()
+            f_["diff_sy"][k] = f_["full"][k] - f_["sy_b"][k]
+            f_["diff_lin"][k] = f_["full"][k] - f_["lin_b"][k]
+            for j in range(nb):
+                mb = (p["dl"] >= edges[j]) & (p["dl"] < edges[j + 1])
+                if mb.any():
+                    for c, s_ in enumerate(("full", "sy_b", "lin_b")):
+                        br[k, c, j] = p[s_][mb].mean()
+        for s_ in far:
+            far[s_].append(f_[s_])
+        bins.append(br)
+
+    print("\nGATE 2 FOLLOW-UP -- far-pair residual vs ln N; truncation mechanism")
+    print("=" * 84)
+    for i, row in enumerate(rows):
+        print(f"  N_nom={N_LADDER2[i]:5d} <N>={row['n'].mean():7.1f}  R={row['n'].size:3d}  "
+              f"eigh+W {row['sec'].mean():6.1f} s   n_SY = {row['n_sy'].mean():6.1f}  "
+              f"n_lin = {row['n_lin'].mean():7.1f} +- {row['n_lin'].std(ddof=1):5.1f} (sd)  "
+              f"[first crossing {row['n_lin_first'].mean():7.1f}]")
+    print("\nReproduction of Gate 2's realisations (untruncated Re w, regenerated from seeds):")
+    repro_ok = True
+    for n_nom, r_old, same_n, dmax in repro:
+        ok = same_n and dmax <= G2B_REPRO_TOL
+        repro_ok &= ok
+        print(f"  N_nom={n_nom:5d}: first {r_old:3d} realisations  same N: {same_n}  "
+              f"max|dRe w| = {dmax:.2e}  -> {'OK' if ok else 'MISMATCH'}")
+
+    # ---- PRIMARY -----------------------------------------------------------
+    prim = rung_fit(far["full"], logn)
+    print("\nPRIMARY: untruncated W, pooled far pairs (d/l >= 2), WLS on rung means")
+    for i in range(len(rows)):
+        print(f"  N_nom={N_LADDER2[i]:5d}  R={prim['R'][i]:3d}  "
+              f"residual {prim['mu'][i]:+.5f} +- {prim['se_rung'][i]:.5f}")
+    print(f"  slope b = {prim['b']:+.5f} +- {prim['se']:.5f} per unit ln N   "
+          f"|b|/SE = {abs(prim['z']):.2f}   chi2 = {prim['chi2']:.2f} (2 dof), "
+          f"Birge {prim['birge']:.2f}")
+    drift = abs(prim["z"]) >= DRIFT_Z
+    conv = abs(prim["b"]) + CONV_Z * prim["se"] <= CONV_BOUND
+    verdict = "DRIFT" if drift else ("CONVERGENCE" if conv else "UNRESOLVED")
+    print(f"  DRIFT needs |b|/SE >= {DRIFT_Z}: {'met' if drift else 'not met'}")
+    print(f"  CONVERGENCE needs |b| + {CONV_Z} SE = {abs(prim['b']) + CONV_Z * prim['se']:.5f}"
+          f" <= {CONV_BOUND}: {'met' if conv else 'not met'}")
+    print(f"  ==> PRIMARY VERDICT: {verdict}" + ("  (also within the convergence bound)"
+                                                 if drift and conv else ""))
+
+    print("\n  Reported, not decisive:")
+    lnn_real = [np.log(row["n"].astype(float)) for row in rows]
+    b_o, se_o = ols_realisations(far["full"], lnn_real)
+    print(f"    OLS on realisations (Gate 2 post-hoc form): {b_o:+.5f} +- {se_o:.5f} "
+          f"({b_o / se_o:+.2f} sigma)")
+    r_old = [o["n"].size for o in old]
+    new = rung_fit(far["full"], logn, sel=[np.arange(r, rows[i]["n"].size)
+                                          for i, r in enumerate(r_old)])
+    print(f"    new seeds only (R = {list(new['R'])}): {new['b']:+.5f} +- {new['se']:.5f} "
+          f"({new['z']:+.2f} sigma)")
+    lit = rung_fit(far["full"], logn, sel=[np.arange(r_old[0]), np.arange(r_old[1]),
+                                          np.arange(rows[2]["n"].size),
+                                          np.arange(rows[3]["n"].size)])
+    print(f"    literal design (Gate 2 R at 512, 1024): {lit['b']:+.5f} +- {lit['se']:.5f} "
+          f"({lit['z']:+.2f} sigma)")
+    for s_, lab in (("full_tl", "timelike"), ("full_sl", "spacelike")):
+        f2 = rung_fit(far[s_], logn)
+        print(f"    {lab:9s} only: {f2['b']:+.5f} +- {f2['se']:.5f} ({f2['z']:+.2f} sigma)")
+
+    # ---- SECONDARY ---------------------------------------------------------
+    print("\nSECONDARY: truncated W from the SAME eigendecompositions "
+          f"({'INTERPRETED' if drift else 'DATA ONLY -- primary did not find drift'})")
+    sec = {}
+    for s_, lab in (("sy_b", "SY  vs rank-matched truncated continuum"),
+                    ("lin_b", "LIN vs rank-matched truncated continuum"),
+                    ("sy_a", "SY  vs untruncated W_SJ (artefact-laden)"),
+                    ("lin_a", "LIN vs untruncated W_SJ (artefact-laden)"),
+                    ("diff_sy", "D_SY  = full - SY_b  (removed-mode drift)"),
+                    ("diff_lin", "D_LIN = full - LIN_b (removed-mode drift)")):
+        sec[s_] = rung_fit(far[s_], logn)
+        print(f"  {lab:44s} means {np.array2string(sec[s_]['mu'], precision=4, sign='+')}"
+              f"  b = {sec[s_]['b']:+.5f} +- {sec[s_]['se']:.5f} ({sec[s_]['z']:+.2f} sigma)")
+    if drift:
+        sgn = np.sign(prim["b"])
+        for t, d in (("sy_b", "diff_sy"), ("lin_b", "diff_lin")):
+            zt, zd = sec[t]["z"], sec[d]["z"]
+            if abs(zt) < MECH_Z_ZERO and np.sign(zd) == sgn and abs(zd) >= MECH_Z_CARRIED:
+                reading = "CARRIED by the removed modes"
+            elif abs(zt) >= MECH_Z_CARRIED and np.sign(zt) == sgn:
+                reading = "NOT CARRIED (drift survives truncation)"
+            else:
+                reading = "INCONCLUSIVE"
+            print(f"  -> {t[:-2].upper():3s}: {reading}")
+
+    print("\nPer-bin residual at the largest N (mean +- SE over realisations): "
+          "full / SY_b / LIN_b")
+    for j in range(nb):
+        cells = []
+        for c in range(3):
+            v = bins[-1][:, c, j]
+            v = v[np.isfinite(v)]
+            cells.append(f"{v.mean():+.4f}+-{v.std(ddof=1) / np.sqrt(v.size):.4f}"
+                         if v.size >= 2 else f"{'--':^15}")
+        print(f"  [{edges[j]:5.2f},{edges[j + 1]:5.2f})  " + "   ".join(cells))
+
+    print("\nKept-mode counts vs N (OLS on log <N>, rung means):")
+    for f, lab in (("n_sy", "n_SY "), ("n_lin", "n_lin")):
+        y = np.log([row[f].mean() for row in rows])
+        print(f"  {lab} ~ N^{np.polyfit(logn, y, 1)[0]:.3f}   "
+              f"(means {[round(float(row[f].mean()), 1) for row in rows]})")
+
+    print(f"\nReproduction check: {'PASS' if repro_ok else 'FAIL'}")
+    print(f"PRIMARY VERDICT: {verdict}   b = {prim['b']:+.5f} +- {prim['se']:.5f} "
+          f"per unit ln N ({abs(prim['z']):.2f} sigma)")
+    make_gate2b_figure(rows, logn, prim, sec, new, bins)
+    print(f"Figure -> {FIG2B}")
+
+
+def make_gate2b_figure(rows, logn, prim, sec, new, bins) -> None:
+    fig, axes = plt.subplots(1, 4, figsize=(22.0, 5.4))
+    nmean = np.exp(logn)
+    xx = np.linspace(logn[0] - 0.2, logn[-1] + 0.2, 50)
+
+    ax = axes[0]
+    ax.errorbar(nmean, prim["mu"], yerr=prim["se_rung"], fmt="o", ms=6, capsize=3,
+                color="tab:blue", label=f"all seeds, R={list(prim['R'])}")
+    ax.errorbar(nmean * 1.04, new["mu"], yerr=new["se_rung"], fmt="o", mfc="none", ms=6,
+                capsize=3, color="tab:blue", alpha=0.6, label="new seeds only")
+    ax.plot(np.exp(xx), prim["a"] + prim["b"] * xx, color="tab:blue", lw=1.2,
+            label=f"WLS b = {prim['b']:+.4f} +- {prim['se']:.4f} / ln N")
+    ax.axhline(0.0, color="k", lw=1.0, ls=":")
+    ax.set_xscale("log")
+    ax.set_xlabel("<N>")
+    ax.set_ylabel("far-pair residual Re w - Re W_SJ  (d >= 2 l)")
+    ax.set_title("A. PRIMARY: untruncated W, pooled far pairs\n"
+                 f"drift iff |b|/SE >= {DRIFT_Z}; convergence iff |b|+2SE <= {CONV_BOUND}",
+                 fontsize=9.5)
+    ax.legend(fontsize=7)
+    ax.grid(alpha=0.25, which="both")
+
+    ax = axes[1]
+    for s_, col, mk, lab in (("sy_b", "tab:orange", "s", "SY vs matched continuum"),
+                             ("lin_b", "tab:green", "^", "LIN vs matched continuum"),
+                             ("sy_a", "tab:orange", "x", "SY vs untruncated W_SJ"),
+                             ("lin_a", "tab:green", "+", "LIN vs untruncated W_SJ")):
+        f = sec[s_]
+        ax.errorbar(nmean, f["mu"], yerr=f["se_rung"], fmt=mk, ms=6, capsize=3, color=col,
+                    label=f"{lab}: b = {f['b']:+.4f} +- {f['se']:.4f}")
+        ax.plot(np.exp(xx), f["a"] + f["b"] * xx, color=col, lw=1.0,
+                ls="-" if s_.endswith("_b") else "--")
+    ax.axhline(0.0, color="k", lw=1.0, ls=":")
+    ax.set_xscale("log")
+    ax.set_xlabel("<N>")
+    ax.set_ylabel("far-pair residual, truncated W")
+    ax.set_title("B. SECONDARY: same eigendecompositions, truncated", fontsize=9.5)
+    ax.legend(fontsize=6.5)
+    ax.grid(alpha=0.25, which="both")
+
+    ax = axes[2]
+    edges = np.array(G2_BINS)
+    mids = np.sqrt(np.maximum(edges[:-1], 0.125) * edges[1:])
+    for c, (col, lab) in enumerate((("tab:blue", "untruncated"), ("tab:orange", "SY_b"),
+                                    ("tab:green", "LIN_b"))):
+        v = bins[-1][:, c, :]
+        ok = np.sum(np.isfinite(v), axis=0) >= 2
+        mu = np.nanmean(v, axis=0)
+        se = np.nanstd(v, axis=0, ddof=1) / np.sqrt(np.sum(np.isfinite(v), axis=0))
+        ax.errorbar(mids[ok], mu[ok], yerr=se[ok], fmt="o-", ms=4, capsize=2, color=col,
+                    label=lab)
+    ax.axhline(0.0, color="k", lw=1.0, ls=":")
+    ax.axvline(G2B_FAR, color="0.5", lw=0.8, ls="--")
+    ax.set_xscale("log")
+    ax.set_xlabel("d / l (binned)")
+    ax.set_ylabel("residual (mean +- SE)")
+    ax.set_title(f"C. Residual vs separation at <N>={rows[-1]['n'].mean():.0f}\n"
+                 "dashed: far-pair cut d = 2 l", fontsize=9.5)
+    ax.legend(fontsize=7)
+    ax.grid(alpha=0.25, which="both")
+
+    ax = axes[3]
+    for f, col, lab in (("n_sy", "tab:orange", "n_SY (lambda >= sqrt(N)/4pi)"),
+                        ("n_lin", "tab:green", "n_lin (SXY, delta = 0.1)")):
+        mu = np.array([row[f].mean() for row in rows])
+        sd = np.array([row[f].std(ddof=1) for row in rows])
+        ax.errorbar(nmean, mu, yerr=sd, fmt="o-", ms=5, capsize=3, color=col, label=lab)
+    ax.plot(nmean, np.sqrt(nmean), "k:", lw=1.0, label="sqrt(N)")
+    ax.plot(nmean, nmean / 4, "k--", lw=1.0, label="N/4")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("<N>")
+    ax.set_ylabel("kept positive modes (mean +- sd)")
+    ax.set_title("D. Modes kept by the two truncations", fontsize=9.5)
+    ax.legend(fontsize=7)
+    ax.grid(alpha=0.25, which="both")
+
+    fig.suptitle("Phase 3a GATE 2 FOLLOW-UP -- far-pair residual vs ln N, untruncated and "
+                 f"truncated W (seeds {SEED_BASE2}+100000 i + k; R = {N_REAL2B})",
+                 fontsize=10.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.92))
+    FIG2B.parent.mkdir(exist_ok=True)
+    fig.savefig(FIG2B, dpi=150)
+    plt.close(fig)
+
+
+# ---------------------------------------------------------------------------- #
+# Linear truncation applied to Gate 1's stored spectra (pre-registered, G1-C)
+# ---------------------------------------------------------------------------- #
+def g1lin(remeasure: bool = False) -> None:  # noqa: ARG001 (analysis of cached data only)
+    rows = load_or_measure_gate1(False)
+    n_mean = np.array([r["n"].mean() for r in rows])
+    logn = np.log(n_mean)
+    per = []
+    for r in rows:
+        ns = r["n"].astype(int)
+        lins, firsts, sys_ = [], [], []
+        for k in range(ns.size):
+            lam = positive_descending(r["ev"][k], ns[k])
+            n_lin, d = sj.linear_truncation_rank(lam, return_diagnostics=True)
+            lins.append(n_lin)
+            firsts.append(d["n_first_crossing"])
+            sys_.append(sj.sy_truncation_rank(lam, ns[k]))
+        per.append({"lin": np.array(lins, float), "first": np.array(firsts, float),
+                    "sy": np.array(sys_, float)})
+    rng = np.random.default_rng(BOOT_SEED)
+    print("\nLinear truncation (SXY, delta = 0.1) on Gate 1's spectra")
+    print("=" * 78)
+    for f, lab in (("lin", "n_lin (last >= m')"), ("first", "first crossing"),
+                   ("sy", "n_SY")):
+        pt = ols_slope(logn, np.log([p[f].mean() for p in per]))
+        bs = [ols_slope(logn, np.log([p[f][rng.integers(0, p[f].size, p[f].size)].mean()
+                                      for p in per])) for _ in range(N_BOOT)]
+        se = float(np.std(bs, ddof=1))
+        means = ", ".join(f"{p[f].mean():.1f}+-{p[f].std(ddof=1) / np.sqrt(p[f].size):.1f}"
+                          for p in per)
+        print(f"  {lab:20s} ~ N^({pt:.3f} +- {se:.3f})   "
+              f"|beta-1/2| = {abs(pt - 0.5) / se:6.1f} sigma, |beta-1| = "
+              f"{abs(pt - 1) / se:6.1f} sigma   means: {means}")
+    for j, p in enumerate(per):
+        print(f"  <N>={n_mean[j]:7.1f}: n_lin/<N> = {p['lin'].mean() / n_mean[j]:.4f}, "
+              f"n_lin/sqrt(<N>) = {p['lin'].mean() / np.sqrt(n_mean[j]):.2f}, "
+              f"per-realisation sd {p['lin'].std(ddof=1):.1f}")
+
+    fig, ax = plt.subplots(figsize=(6.4, 5.0))
+    for f, col, lab in (("lin", "tab:green", "n_lin (SXY linear, delta=0.1)"),
+                        ("first", "tab:olive", "first downward crossing"),
+                        ("sy", "tab:orange", "n_SY (sqrt(N)/4pi)")):
+        mu = np.array([p[f].mean() for p in per])
+        sd = np.array([p[f].std(ddof=1) for p in per])
+        ax.errorbar(n_mean, mu, yerr=sd, fmt="o-", ms=5, capsize=3, color=col, label=lab)
+    ax.plot(n_mean, np.sqrt(n_mean), "k:", lw=1.0, label="sqrt(N)")
+    ax.plot(n_mean, n_mean / 4, "k--", lw=1.0, label="N/4")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("<N>")
+    ax.set_ylabel("rank (mean +- sd over realisations)")
+    ax.set_title("SXY linear truncation on Gate 1 spectra\n"
+                 f"(R = {N_REAL}; seeds {SEED_BASE}+100000 i + k)", fontsize=9.5)
+    ax.legend(fontsize=7)
+    ax.grid(alpha=0.25, which="both")
+    fig.tight_layout()
+    fig.savefig(FIG1L, dpi=150)
+    plt.close(fig)
+    print(f"Figure -> {FIG1L}")
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
-    if not args or args[0] not in ("gate1", "gate2"):
-        sys.exit("usage: exp06_sj_1p1d.py {gate1|gate2} [--remeasure]")
-    {"gate1": gate1, "gate2": gate2}[args[0]](remeasure="--remeasure" in args)
+    cmds = {"gate1": gate1, "gate2": gate2, "gate2b": gate2b, "g1lin": g1lin}
+    if not args or args[0] not in cmds:
+        sys.exit("usage: exp06_sj_1p1d.py {gate1|gate2|gate2b|g1lin} [--remeasure]")
+    cmds[args[0]](remeasure="--remeasure" in args)

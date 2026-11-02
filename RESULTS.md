@@ -1287,7 +1287,7 @@ transpose cannot pass. Nothing about agreement with the continuum has been claim
 
 ---
 
-## 2026-10-05 — Phase 3a GATE 1: iΔ spectrum vs the continuum diamond — PASS, with a discrepancy against Sorkin–Yazdi's √N/4π landmark
+## 2026-10-05 — Phase 3a GATE 1: iΔ spectrum vs the continuum diamond — PASS; the eigenvalue knee scales as N (G1-C revised 2026-11-02)
 
 - **Branch:** `phase3-sj` (on top of `b5e92d9`, Part 1)
 - **Experiment:** `experiments/exp06_sj_1p1d.py gate1` (`exp05` name was taken — see Part 1 entry, D5)
@@ -1353,13 +1353,21 @@ Primary α is 428σ from 0.
 
 **GATE 1: PASS** (G1-A and G1-B).
 
-### G1-C — comparison with the published landmark: **DISCREPANT (212σ)**
+### G1-C — how the eigenvalue knee scales, against the √N/4π landmark (reported, not part of PASS)
+
+*Revised 2026-11-02 after reading Keseman–Muneesamy–Yazdi (KMY) 2111.05879, Mathur–Surya–X
+(MSX) 2207.01080 and the paper MSX cite for the linear truncation, Surya–X–Yazdi (SXY)
+2008.07697, all in full LaTeX. Numbers unchanged; the characterisation is changed. See the
+revision note at the end of this subsection.*
 
 Sorkin–Yazdi (1611.10281 §3, Fig. "spec", one causet, N = 200, ρ = 50) state that causet and
 continuum spectra agree above λ^cs = √N/4π and are "in very poor agreement below it", with a
-"break" there. That landmark scales as m_SY ∝ √N. **Measured: the knee scales as N, not √N,
-at every threshold.** Panel C (r̄ vs m/N) collapses all five N onto one curve; panel B
-(r̄ vs m/√N) fans out. Equivalently the knee sits at a fixed *absolute* causet eigenvalue:
+"break" there. The pre-registered G1-C comparison read that landmark as a statement about how
+the knee moves with N, i.e. m* ∝ √N (α = ½). **Measured: the eigenvalue knee rank scales as N
+at every threshold**: α = 0.990 ± 0.002 at the primary δ, 212σ from ½. That is the
+pre-registered criterion's outcome; its label in the experiment output is "DISCREPANT".
+Panel C (r̄ vs m/N) collapses all five N onto one curve; panel B (r̄ vs m/√N) fans out.
+Equivalently the knee sits at a fixed *absolute* causet eigenvalue:
 λ*(δ = 0.1) = 0.800, 0.818, 0.826, 0.824, 0.828 for ⟨N⟩ = 258 … 4125
 (λ* ∝ N^{0.011 ± 0.002} — not exactly flat, 5σ, but within 3% over a 16× range in N).
 
@@ -1367,30 +1375,77 @@ At SY's landmark itself the agreement *improves* with N: 1 − r̄(m_SY) = 0.048
 0.0056, 0.0033 — falling ~1/N. (Observation only, not claimed: (1 − r̄(m_SY))·(√N/4π)² =
 0.079, 0.078, 0.072, 0.073, 0.086 ± 0.016, i.e. consistent with a deviation ∝ 1/λ².)
 
-**Why SY could not see this:** at their N = 200, √N/4π = 1.13 — numerically on top of the
-N-independent O(1) eigenvalue where the roll-off actually begins. A single N cannot separate
-the two scalings; a ladder can.
+**This is consistent with SY's own data.** At their N = 200, √N/4π = 1.13 sits on top of the
+N-independent O(1) eigenvalue where the roll-off begins, so at a single N the two scalings
+coincide numerically. SY did not measure how the eigenvalue knee moves with N. Their √N/4π comes
+from the discreteness-wavelength argument (k_max ~ 2π√ρ, so λ_min = ρL/k_max), not from a
+ladder in N. What is new here is a measurement of a quantity SY did not report.
+
+**Does either paper already report this scaling? No.** What each says:
+
+- **KMY 2111.05879** §"Relation to Truncations" measures an **eigenvector** transition: the rank
+  beyond which eigenvectors become sprinkling-specific "fluctuations", from averaging over
+  ensembles that share a coarse-grained causet, N ≤ 2200. It finds λ_transition =
+  (0.13 ± 0.03) N^{0.46 ± 0.04}, "close to" √N/4π. Their discussion of the *eigenvalue* spectrum
+  is qualitative, from one N = 2000 causet: it deviates from a power law "around the
+  discreteness scale". They give no N-scaling for the eigenvalue knee.
+- **MSX 2207.01080** (a review), §"SSEE in the Causal Set", models the spectrum as a power law up
+  to a knee n₀ followed by a UV regime with λ linear in n. It says √N/4π "corresponds roughly to
+  the knee" in its Fig. 1 and gives no N-scaling for n₀. It names two truncation families. The
+  *number* truncation is n_max = α N^{(d−1)/d}, i.e. ∝ √N in d = 2, which is the SY family. The
+  *linear* truncation's definition it defers to SXY. *Terminology hazard:* MSX's "linear
+  regime" is the UV end (λ ∝ n), whereas in SXY "linear" means the power-law regime, linear on
+  log–log axes, and the linear truncation cuts at the end of *that*.
+- **SXY 2008.07697**, the source of the linear truncation, finds in the dS₂ slab that the number
+  truncations "lie in the linear [power-law] regime, with the linear truncation being the
+  closest to the knee". So they already saw, in one geometry and qualitatively, that √N-type
+  cuts fall inside the power-law regime, short of the knee. They give no N-scaling for the knee or
+  for their n_max.
+
+**How the knee scaling bears on choosing between the two truncations.** The number/magnitude
+truncation and a knee-tracking truncation coincide only if the eigenvalue knee sits near
+√N/4π. At large N it does not. The SY cut keeps ≈ m_SY ∝ √N modes (128 at N ≈ 4100), while the
+eigenvalues track the continuum to within 10% out to rank ≈ 0.17 N (714). If the SXY slope
+criterion follows the same knee, the linear truncation keeps a number of modes ∝ N, and the two
+prescriptions diverge by a factor ∝ √N, about 5–6 at N ≈ 4100. Whether the SXY criterion does
+scale like this ratio knee is a pre-registered measurement (g1lin, entry of 2026-11-02 below).
+The eigenvalues alone cannot say which truncation is right. The √N cut's justification is about
+eigenvectors and wavelengths, and KMY's eigenvector transition ∝ N^{0.46 ± 0.04} supports it
+directly (N ≤ 2200, one method). The eigenvalue knee measured here shows only that the
+*eigenvalue* agreement extends far beyond √N at large N. The two observables measure
+different things, and both results can stand.
 
 ### What this does and does not mean
 
-- **It refutes, at large N, the *spectral-break* justification for the √N/4π cut** — rank-ordered
-  causet eigenvalues track the continuum to < 0.5% well below the landmark for N ≳ 2000.
-- **It does not refute the SY truncation rule.** SY give a second, independent argument: a cutoff
-  at the discreteness wavelength ρ^{−1/2} converted through the continuum wavelength–eigenvalue
-  relation (1611.10281 §3, "Another way to think of where the √N/4π comes from"). That argument
-  is about *eigenvectors*. This gate compares rank-ordered *eigenvalues* only, and agreement of
-  the counting function says nothing about whether the m-th causet eigenvector resembles the
-  m-th continuum mode — below the discreteness wavelength it plausibly does not. Not tested here.
+- **The eigenvalue spectrum alone does not single out √N/4π at large N.** Rank-ordered causet
+  eigenvalues track the continuum to < 0.5% well below the landmark for N ≳ 2000.
+- **It says nothing against the SY truncation rule.** SY's wavelength argument (1611.10281 §3,
+  "Another way to think of where the √N/4π comes from") is about *eigenvectors*. This gate
+  compares rank-ordered *eigenvalues* only, and agreement of the counting function does not show
+  that the m-th causet eigenvector resembles the m-th continuum mode. KMY's eigenvector evidence
+  points to a transition near √N/4π. Not tested here.
 - **Consequence for Gate 3:** apply SY's truncation exactly as published (λ̃_min ~ √N/4π, both
   diamonds). Do not "improve" it by moving the cut to the spectral knee found here — that would be
   a different prescription and would not be a reproduction. If Gate 3 is sensitive to the cut,
-  that sensitivity must be reported against this finding.
+  that sensitivity must be reported against this finding and against the linear truncation.
+
+*Revision note (2026-11-02).* The original wording (commit 8097610) had the heading "with a
+discrepancy against Sorkin–Yazdi's √N/4π landmark", a G1-C verdict of "DISCREPANT (212σ)", the
+sentence "It refutes, at large N, the spectral-break justification for the √N/4π cut", a
+paragraph "Why SY could not see this", and the honest line "the published 'break at √N/4π' does
+not survive a ladder in N". It was revised for three reasons. (i) SY report a single N, at which
+these data agree with them. (ii) The √N scaling of the eigenvalue knee was this project's
+extrapolation of their landmark, not a claim they tested. (iii) The literature check above shows
+that the √N rule has independent eigenvector support (KMY), and that the knee's N-scaling
+matters for choosing between two published truncations, not for deciding whether SY were
+right. The pre-registered criterion, its numbers and the PASS verdict are unchanged.
 
 ### Honest line
 
-The causet iΔ reproduces the continuum diamond spectrum far deeper than the published landmark
-says, and the place where it stops scales like N, not √N; the gate passes on its pre-set terms,
-and the published "break at √N/4π" does not survive a ladder in N.
+The causet iΔ reproduces the continuum diamond spectrum, in eigenvalue, far deeper in rank than
+√N/4π, and the eigenvalue knee scales like N; the gate passes on its pre-set terms. Neither KMY
+nor MSX reports this scaling. It bears on choosing between the published √N and linear
+truncations, and it does not contradict SY, whose single-N data it matches.
 
 ---
 
@@ -1505,3 +1560,144 @@ The causal-set SJ two-point function matches the exact continuum one to about 1%
 beyond two discreteness lengths, reproducing the published comparison more stringently than it
 was published; but the pre-registered convergence test fails, and there is a 2.7σ hint of a slow
 ln N drift through zero that the run was not powerful enough to confirm or exclude.
+
+---
+
+## 2026-11-02 — Phase 3a GATE 2 FOLLOW-UP: PRE-REGISTRATION (committed before any data were generated)
+
+- **Branch:** `phase3-sj` (on top of `6bf7b8f`, Gate 2)
+- **Experiment:** `experiments/exp06_sj_1p1d.py gate2b` (measurement + analysis) and `g1lin`
+  (linear truncation on Gate 1's stored spectra). Design also in the experiment docstring.
+- **Code frozen in this commit:** `sj.sy_truncation_rank`, `sj.linear_truncation_rank`,
+  `sj.wightman_block` (constants `SY_TRUNCATION_PREFACTOR`, `LIN_*`), `sj_continuum.w_sj_modes`;
+  12 new tests (knee finder on *synthetic* spectra only; block builder vs `sj_wightman`;
+  truncated continuum vs brute-force mode sums and vs exact W_SJ). `python -m pytest` → **189 passed**.
+- **Sources read in full LaTeX for this entry:** KMY 2111.05879; MSX 2207.01080 (author list as
+  printed: A. Mathur, S. Surya, Nomaan X); SXY 2008.07697 (CQG 38 115001), which MSX cite for
+  the linear truncation's definition.
+
+### What had been seen when this was written
+
+No causet has been sprinkled for this follow-up, and the knee finder has not been run on any
+causet spectrum. Already seen: (1) all Gate 2 data — the hint came from them; (2) on those cached
+data, the far-pair slope in two forms: realisation-level OLS (Gate 2's post-hoc form, reproduced
+exactly) **−0.00276 ± 0.00103 (2.67σ)** and inverse-variance WLS on rung means **−0.00259 ±
+0.00070 (3.70σ)**; per character (OLS) timelike −0.0028 ± 0.0011, spacelike −0.0024 ± 0.0010;
+per-realisation sd of the far mean 0.0118, 0.0080, 0.0042, 0.0043 at N = 512 … 4096;
+(3) Gate 1's spectra and knee table; (4) the three papers.
+
+### Design
+
+- Gate 2's ladder N_nom = 512, 1024, 2048, 4096, same seed scheme `20261006 + 100000·i + k`, same
+  centre square (8% of area), τ = 1. **R = 384, 192, 96, 36 — 3× Gate 2 at every rung.**
+- **Deviation from the brief (3× at N = 2048 and 4096 only), made for power.** With Gate 2's
+  per-realisation scatter, the brief's design gives a projected slope SE of 0.00056. If the true
+  slope equals the hint (−0.0026 to −0.0028), that is E|z| = 4.6–5.0, and the 5σ drift threshold
+  is reached with probability only 35–49%. Tripling the two cheap rungs as well costs ≈ 8 min and
+  gives SE 0.00040, E|z| = 6.4–6.9, probability 92–97%. The brief's literal design (Gate 2's R at
+  512 and 1024) is reported as a sensitivity line and does not decide.
+- **Reuse of seen data.** The first R_Gate2 seeds of every rung are Gate 2's realisations,
+  regenerated: one third of the data are those that produced the hint, which biases |b| upward
+  (winner's curse). A slope from the new seeds only (R = 256, 128, 64, 24) is reported; it does
+  not decide.
+- **Reproduction check (gating).** The regenerated realisations must have the same N and
+  reproduce Gate 2's cached untruncated Re w to max |Δ| ≤ 1e-5. If not: stop, report, no verdict.
+- **One eigendecomposition per realisation** (`numpy.linalg.eigh`). From it, three W's on the centre
+  square: untruncated; SY-truncated; linear-truncated.
+
+### PRIMARY — decides Gate 2's drift question
+
+- **Statistic.** Per realisation, y_k = mean of Re w − Re W_SJ (exact continuum) over all
+  centre-square pairs with d ≥ 2ℓ, timelike and spacelike pooled. This is Gate 2's post-hoc
+  pooling, reproduced exactly above. Per rung: mean and SE over realisations. **Slope b in
+  ln⟨N⟩ by inverse-variance WLS on the four rung means; SE multiplied by the Birge ratio
+  max(1, √(χ²/2)).**
+- **Estimator choice, disclosed.** WLS rather than Gate 2's realisation-level OLS, because the
+  per-realisation scatter differs 2.8× between rungs; homoscedastic OLS mis-weights the rungs and
+  misstates its SE. This choice was made *after* both forms had been computed on the Gate 2
+  data, where WLS gives the larger significance (3.7σ vs 2.7σ). The reader should weigh that.
+  OLS is reported alongside.
+- **DRIFT** iff **|b| / SE ≥ 5**.
+- **CONVERGENCE** iff **|b| + 2 SE ≤ 0.0015 per unit ln N**, i.e. the 95% interval lies inside
+  ±0.0015. Why 0.0015: it is about half the hinted magnitude, and about 0.001 per doubling of N,
+  which is 0.3–0.7% of Re W (0.35 → 0.15) across the far range. At that rate the far residual
+  would need N to grow by e¹³ to move by Gate 2's tolerance 0.02. With the projected SE (0.0004),
+  a true slope of zero is claimed as convergence with probability ≈ 0.92. "Convergence" here bounds
+  the ln N drift only; a constant offset in the far residual is a separate quantity, reported but
+  not graded.
+- **UNRESOLVED** otherwise. If DRIFT and the convergence condition both held (only possible with
+  SE < 0.0002), DRIFT is reported, together with the bound.
+- Reported, not decisive: OLS on realisations; new seeds only; the literal design; timelike and
+  spacelike separately.
+
+### SECONDARY — mechanism; interpreted ONLY if PRIMARY = DRIFT
+
+**Truncations, from the same eigendecompositions** (single truncation on the full diamond; the
+SSEE's "double truncation" needs a subregion and does not arise for W):
+
+1. **SY:** keep positive eigenvalues λ ≥ √N/4π, with N the number of elements in the causet
+   (SY 1611.10281 §3; KMY eq. (mineig)).
+2. **Linear truncation, definition as fetched.** MSX 2207.01080 §4 describes it ("numerically
+   identifying the location of the knee … comparison of the slopes and detection of a rapid fall
+   in the slopes … a single parameter δ") and defers its details to SXY 2008.07697, §"Generalised
+   Truncation Schemes". SXY's steps:
+   (a) take ln λ_n against ln n;
+   (b) compute the slope between each nearest-neighbour pair;
+   (c) bin the slopes and average them;
+   (d) fit a smooth interpolating function to the averaged slopes;
+   (e) identify the region of nearly constant slope m;
+   (f) mark the knee at a drop to m′, with fractional drop δ = (m − m′)/m;
+   (g) keep the n_max ranks up to the knee, rounded to the nearest integer.
+   δ ≈ 0.1 was SXY's d = 2 (dS₂) choice; they used δ ≈ 0.15 for dS₄ and δ = 0.2 for nested
+   diamonds in M⁴. **SXY leave several choices open. Ours (fixed now, in `sj.LIN_*`):**
+   - 10 log bins per decade of rank, with the pair slope placed at √(n(n+1));
+   - a PCHIP interpolant in log₁₀ n through the bin averages;
+   - plateau slope m = −1, from SXY's own statement that the diamond spectrum has a = 1;
+   - δ = 0.1, so the threshold is m′ = −1.1;
+   - the pair 1→2 is excluded, because the continuum's own 1→2 slope is −1.43 and every later
+     continuum pair slope is ≥ −1.081 (computed from the continuum alone);
+   - **knee = the last rank at which the smoothed slope is still ≥ m′**. This is one-sided, so an
+     isolated dip inside the plateau cannot end it. The first downward crossing is reported as a
+     diagnostic. If the slope never falls below m′, nothing is truncated.
+
+   No parameter here was taken from Gate 1's measured knee, and the algorithm has not yet been
+   run on causet data.
+
+**Continuum targets.**
+
+- (a) **Exact W_SJ**, as first specified. This comparison carries the truncation's own artefact.
+  Removing modes also removes genuine continuum modes above the cut. For the SY cut at d = 2ℓ
+  their contribution is of order (1/4π)/(k_max d) ≈ 0.006, the same order as the drift. It is
+  N-independent at fixed d/ℓ, but N-dependent in the pooled mean, because the d/ℓ mix of far pairs
+  changes with N. So comparison (a) alone cannot isolate the mechanism.
+- (b) **Control:** the continuum W truncated to the **same number of modes**
+  (`sj_continuum.w_sj_modes`, rank-matched per realisation). **Mechanism readings use (b).**
+
+**Hypothesis (stated in advance, as given):** if the drift is carried by the non-continuum
+near-zero modes Gate 1 identified, the far-separation drift vanishes under truncation.
+
+**Readings, for each truncation T.** Write b_T for the slope of Re w_T − Re W_SJ,T, and D_T for
+the paired removed-mode drift, the slope of the per-realisation difference (full − T). Both use
+the same WLS/Birge estimator.
+
+- **CARRIED:** |b_T|/SE < 2, and D_T has the sign of b with |D_T|/SE ≥ 3.
+- **NOT CARRIED:** |b_T|/SE ≥ 3, with the sign of b.
+- **INCONCLUSIVE:** otherwise.
+
+The two truncations remove different sets of modes. The hypothesis is about the near-zero,
+non-continuum modes, so the more relevant truncation is the one whose removed set lies beyond the
+eigenvalue knee. Which one that is will be read from the reported n_SY and n_lin against Gate 1's
+knee. **If PRIMARY ≠ DRIFT, every secondary number is reported as data only, with no
+mechanistic interpretation.**
+
+### Also pre-registered: `g1lin` — the linear truncation on Gate 1's spectra (bears on G1-C)
+
+Apply the same `linear_truncation_rank` to all 620 Gate 1 realisations, which have N = 256 …
+4096 and are already on disk. Report the exponent β of n_lin ∝ N^β (OLS on log⟨N⟩, bootstrap SE,
+seed 77, 2000 resamples), with n_SY alongside. The reading is fixed now:
+
+- "tracks √N" iff |β − ½| ≤ 2σ;
+- "tracks N" iff |β − 1| ≤ 2σ;
+- otherwise "neither".
+
+Reported only; no gate.

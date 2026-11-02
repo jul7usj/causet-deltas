@@ -193,3 +193,110 @@ def sj_wightman(
     if return_spectrum:
         return w, (evals, evecs, tol)
     return w
+
+
+# --------------------------------------------------------------------------- #
+# Spectral truncations of W (Phase 3a Gate 2 follow-up; NOT used by Gates 1-2)
+# --------------------------------------------------------------------------- #
+# Both rules act on the positive spectrum of iDelta on the FULL causet and keep
+# its top ``n_keep`` modes (single truncation: no subregion is involved, so the
+# "double truncation" of SY / SXY for the SSEE does not arise here).
+
+#: Sorkin--Yazdi 1611.10281 Sec. 3 (also KMY 2111.05879 eq. (mineig)):
+#: keep eigenvalues ``lambda >= sqrt(N)/(4 pi)``, N = elements of the causet.
+SY_TRUNCATION_PREFACTOR = 1.0 / (4.0 * np.pi)
+
+#: "Linear truncation", Surya--X--Yazdi 2008.07697 Sec. "Generalised Truncation
+#: Schemes" (cited for its definition by Mathur--Surya--X 2207.01080 Sec. 4):
+#: the knee is where the binned, smoothed log-log slope of the spectrum drops
+#: from the plateau slope ``m`` to ``m' = m (1 + delta)``. SXY's d = 2 choice is
+#: delta ~ 0.1 ("most compatible with the area law", dS_2).
+LIN_DELTA = 0.1
+#: Plateau slope m: the continuum diamond spectrum is lambda ~ 1/n, i.e. a = 1
+#: in SXY eq. (csmagtrunc) ("For D_L^2, a = 1 and b = 1/(4 pi)").
+LIN_PLATEAU_SLOPE = -1.0
+#: Log-spaced slope bins per decade of rank. SXY bin and average the pair
+#: slopes but do not state the bin width; this value is OUR choice, fixed
+#: before any data were generated (pre-registration, RESULTS.md 2026-11-02).
+LIN_BINS_PER_DECADE = 10
+#: First rank pair used. The continuum diamond's own 1->2 pair slope is -1.43
+#: (below the threshold -1.1 by itself); every later continuum pair slope is
+#: >= -1.081. Excluding pair 1->2 is fixed from the continuum alone.
+LIN_FIRST_RANK = 2
+#: Evaluation grid for the interpolant, points per decade of rank.
+LIN_GRID_PER_DECADE = 1000
+
+
+def sy_truncation_rank(lam_desc: np.ndarray, n_elements: int) -> int:
+    """Number of positive eigenvalues ``>= sqrt(N)/(4 pi)`` (Sorkin--Yazdi cut)."""
+    lam = np.asarray(lam_desc, float)
+    return int(np.sum(lam >= SY_TRUNCATION_PREFACTOR * np.sqrt(n_elements)))
+
+
+def linear_truncation_rank(
+    lam_desc: np.ndarray,
+    *,
+    delta: float = LIN_DELTA,
+    plateau: float = LIN_PLATEAU_SLOPE,
+    bins_per_decade: int = LIN_BINS_PER_DECADE,
+    first_rank: int = LIN_FIRST_RANK,
+    return_diagnostics: bool = False,
+):
+    """Knee rank ``n_lin`` of the SXY linear truncation; keep ranks ``1..n_lin``.
+
+    Implements SXY 2008.07697 Sec. "Generalised Truncation Schemes" step by step:
+    (1) ``ln lambda_n`` against ``ln n`` for the positive spectrum, descending;
+    (2) the slope between each nearest-neighbour pair, placed at
+    ``n_mid = sqrt(n (n+1))``; (3) slopes binned (``bins_per_decade`` log bins)
+    and averaged; (4) a smooth interpolating function (monotone cubic PCHIP in
+    ``log10 n`` through the bin averages); (5) the knee is where that function
+    drops below ``m' = plateau * (1 + delta)``.
+
+    Which crossing: the LAST rank at which the smoothed slope is still
+    ``>= m'`` (one-sided, so an isolated dip inside the plateau cannot end it;
+    past the knee the slope only steepens). The FIRST downward crossing is
+    returned as a diagnostic. ``n_lin`` is rounded to the nearest integer, as
+    SXY do. If the slope never falls below ``m'`` nothing is truncated
+    (``n_lin = M``).
+    """
+    from scipy.interpolate import PchipInterpolator
+
+    lam = np.asarray(lam_desc, float)
+    m_tot = lam.size
+    n = np.arange(1, m_tot + 1, dtype=float)
+    s = np.diff(np.log(lam)) / np.diff(np.log(n))
+    nmid = np.sqrt(n[:-1] * n[1:])
+    use = n[:-1] >= first_rank
+    s, lx = s[use], np.log10(nmid[use])
+    k = np.floor(lx * bins_per_decade).astype(int)
+    keys = np.unique(k)
+    cen = np.array([lx[k == b].mean() for b in keys])
+    avg = np.array([s[k == b].mean() for b in keys])
+    thr = plateau * (1.0 + delta)
+    f = PchipInterpolator(cen, avg, extrapolate=False)
+    npts = max(2, int(np.ceil((cen[-1] - cen[0]) * LIN_GRID_PER_DECADE)) + 1)
+    g = np.linspace(cen[0], cen[-1], npts)
+    above = f(g) >= thr
+    if above.all():
+        n_lin, n_first = m_tot, m_tot
+    elif not above.any():
+        n_lin, n_first = 1, 1
+    else:
+        n_lin = int(np.clip(round(10 ** g[np.nonzero(above)[0].max()]), 1, m_tot))
+        n_first = int(np.clip(round(10 ** g[np.nonzero(~above)[0].min()]), 1, m_tot))
+    if return_diagnostics:
+        return n_lin, {"n_first_crossing": n_first, "bin_log10n": cen, "bin_slope": avg,
+                       "threshold": thr}
+    return n_lin
+
+
+def wightman_block(evals_pos: np.ndarray, evecs_pos: np.ndarray, rows: np.ndarray,
+                   n_keep: int | None = None) -> np.ndarray:
+    """``W`` restricted to ``rows x rows`` from the top ``n_keep`` positive modes.
+
+    ``evals_pos`` descending with matching eigenvector columns ``evecs_pos``.
+    ``n_keep=None`` keeps all (the untruncated W of ``sj_wightman``).
+    """
+    k = evals_pos.size if n_keep is None else int(n_keep)
+    v = evecs_pos[rows, :k]
+    return (v * evals_pos[:k]) @ v.conj().T

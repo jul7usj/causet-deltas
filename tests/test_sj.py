@@ -303,3 +303,69 @@ def test_top_mode_is_positive_frequency(sprinkled):
     g /= np.linalg.norm(g)
     assert abs(np.vdot(g, top)) ** 2 > POS_FREQ_MIN_OVERLAP
     assert abs(np.vdot(g.conj(), top)) ** 2 < NEG_FREQ_MAX_OVERLAP
+
+
+# --------------------------------------------------------------------------- #
+# 4. Spectral truncations (Gate 2 follow-up). Synthetic spectra only for the
+#    knee finder, so no causet data inform its parameters.
+# --------------------------------------------------------------------------- #
+
+
+def _knee_spectrum(m_tot, n0, steep=-3.0, noise=0.0, seed=0):
+    """lambda ~ 1/n up to n0, then ~ n^steep (continuous); optional log-noise."""
+    n = np.arange(1, m_tot + 1, dtype=float)
+    lam = np.where(n <= n0, 1.0 / n, (1.0 / n0) * (n / n0) ** steep)
+    if noise:
+        lam = lam * np.exp(noise * np.random.default_rng(seed).standard_normal(m_tot))
+        lam = np.sort(lam)[::-1]
+    return lam
+
+
+@pytest.mark.parametrize("n0", [40, 150, 600])
+def test_linear_truncation_finds_imposed_knee(n0):
+    n_lin = sj.linear_truncation_rank(_knee_spectrum(3000, n0))
+    # One log bin (10 per decade) is a factor 10**0.1 = 1.26 in rank.
+    assert n0 / 1.3 <= n_lin <= n0 * 1.3
+
+
+def test_linear_truncation_robust_to_small_noise():
+    n_lin, diag = sj.linear_truncation_rank(_knee_spectrum(3000, 300, noise=1e-3),
+                                            return_diagnostics=True)
+    assert 300 / 1.3 <= n_lin <= 300 * 1.3
+    # one clean crossing: the first point below is the grid point after n_lin
+    assert diag["n_first_crossing"] <= n_lin + 1
+
+
+def test_linear_truncation_pure_power_law_keeps_all():
+    assert sj.linear_truncation_rank(1.0 / np.arange(1, 2001.0)) == 2000
+
+
+def test_linear_truncation_ignores_first_pair():
+    """A continuum-like steep 1->2 step (slope -1.43) must not end the plateau."""
+    lam = _knee_spectrum(2000, 500)
+    lam[0] = lam[1] * 2.0 ** 1.43
+    n_lin = sj.linear_truncation_rank(lam)
+    assert 500 / 1.3 <= n_lin <= 500 * 1.3
+
+
+def test_sy_truncation_rank_counts_threshold():
+    n = 400
+    cut = np.sqrt(n) / (4.0 * np.pi)
+    lam = np.array([3.0, 2.0, cut, cut * 0.999, 0.1])
+    assert sj.sy_truncation_rank(lam, n) == 3
+
+
+def test_wightman_block_matches_full_w(sprinkled):
+    _, _, _, i_delta, w, *_ = sprinkled
+    evals, evecs = sj.pauli_jordan_spectrum(i_delta)
+    tol = sj.zero_tolerance(evals, evals.size)
+    pos = np.nonzero(evals > tol)[0][::-1]
+    rows = np.arange(0, evals.size, 3)
+    blk = sj.wightman_block(evals[pos], evecs[:, pos], rows)
+    assert np.allclose(blk, w[np.ix_(rows, rows)], atol=1e-12)
+    # truncated block = full block minus the dropped modes' outer products
+    k = pos.size // 3
+    v = evecs[np.ix_(rows, pos[k:])]
+    dropped = (v * evals[pos[k:]]) @ v.conj().T
+    assert np.allclose(sj.wightman_block(evals[pos], evecs[:, pos], rows, k), blk - dropped,
+                       atol=1e-12)
