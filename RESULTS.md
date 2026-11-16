@@ -1953,3 +1953,108 @@ by SHA-256. All four are regenerable from the seeds recorded above.
 **Data:** a single compressed file `data/exp07_gate3_ssee.npz` with per-realisation scalars only.
 Expected size is well under 1 MB. If any file exceeds ~20 MB it will be added to `.gitignore`
 and recorded by size and SHA-256 before any commit. `data/*.partial.npz` checkpoints are ignored.
+
+---
+
+## 2026-11-16 — Phase 3a GATE 3: RESULTS — PRIMARY: **PASS** (a = 0.336 ± 0.028); prefactor sweep: **NO PLATEAU**
+
+- **Pre-registration:** `4806c7c`, committed and pushed before any data were generated
+- **Run:** `python experiments/exp07_ssee_1p1d.py` — **2431 s of compute (40.5 min)**, under the
+  60-min cap; no reduction was needed. Per-realisation solve time: 0.5 s at N_L ≈ 514, up to
+  48.9 s at N_L ≈ 4079.
+- **Figure:** `figures/exp07_gate3_ssee.png`. **Raw data:** `data/exp07_gate3_ssee.npz`
+  (per-realisation scalars).
+- **Structural, every realisation:** max |Im λ| = 3.4e-14; no realisation hit the 30%
+  eigenvector cap.
+
+### PRIMARY VERDICT: **PASS**
+
+The published double truncation (c = 1), ℓ/L = ½, fitted over N_L ≥ 1024 (x = √N_ℓ/4π ≈ 1.28–2.53,
+160 realisations, R = 48, 40, 32, 24, 16):
+**a = 0.3357 ± 0.0280, b = 1.878 ± 0.017.**
+
+- **Against SY's 0.346 ± 0.028:** z = −0.26 on the combined uncertainty 0.040, so **PASS**
+  (|z| ≤ 2). Against b = 1.883 ± 0.035: −0.14σ (reported).
+- **Against the continuum 1/3:** z = +0.09.
+- **All rungs including N_L = 512, 724** (x = 0.90, 1.08, below SY's x range; reported):
+  a = 0.385 ± 0.017. The low-x points lie below the log line, so the coefficient is not yet
+  stable at x ≲ 1.1.
+
+Rung means of S at c = 1: 1.786, 1.889, 1.964, 2.003, 2.070, 2.143, 2.208 (each ± 0.011–0.014),
+for ⟨N_ℓ⟩ = 129 … 1014. Modes kept at c = 1: 44 → 127 positive outer modes and 17 → 55 inner
+modes.
+
+### PREFACTOR SWEEP: **NO PLATEAU** — stated plainly
+
+| c (both cuts × c) | a | b | a − a(1), in units of SE(a(1)) | vs 0.346 ± 0.028 (z) |
+|---|---|---|---|---|
+| 0.5 | 0.632 ± 0.067 | 4.57 | +10.6 | +3.9 → would FAIL |
+| 0.71 | 0.411 ± 0.041 | 2.82 | **+2.7** | +1.3 → would pass |
+| **1** | **0.336 ± 0.028** | **1.88** | 0 | −0.3 → PASS |
+| 1.41 | 0.365 ± 0.020 | 1.31 | +1.0 | +0.5 → would pass |
+| 2 | 0.341 ± 0.015 | 1.00 | +0.2 | −0.1 → would pass |
+
+**By the pre-registered criterion there is no plateau.** a(0.71) departs from a(1) by 2.7 SE, so
+the contiguous run satisfying the criterion is c = 1 alone. (The c = 1.41 point sits at 1.04 SE,
+also just outside.) As fixed in advance: **a gate whose outcome can be dialled by the cut is weak
+evidence, whether or not the target is hit.** Here the dial is real. Loosening the cut by a
+factor 2 (c = 0.5, which keeps more of the near-zero modes) moves a to 0.63 and fails the target
+at 3.9σ. SY give the cut only as "~ √N/4π", so the paper does not exclude that choice.
+
+*Descriptive, not pre-registered:* the dependence is one-sided. For c ≥ 1, where the cut is
+equal or tighter, a = 0.336, 0.365, 0.341, all within 1.6σ of 1/3. The coefficient grows only
+when the cut is loosened below c = 1, towards the untruncated volume law. Only the intercept b
+moves strongly for c ≥ 1, as a constant would. Four of the five prefactors would pass the
+target's band. That band is wide (± 0.079 at 2σ), so even c = 0.71's 0.41 passes it. **The PASS
+therefore shows consistency with SY, not a sharp test of the coefficient.**
+
+### SECONDARY — linear truncation (SXY, δ = 0.1): **DIFFERENT**
+
+a_lin = 6.51 ± 0.26 (log-fit form), against a_SY = 0.336. The paired difference is
++6.17 ± 0.22, **z = +28 → DIFFERENT.** Against 1/3: z = +24. Against 0.346: z = +24.
+**Neither target is met.**
+
+Rung means of S_lin: 1.88, 2.19, 2.80, 3.43, 4.48, 5.77, 7.67. Modes kept: outer n_lin 64 → 478,
+inner 13 → 82. *Descriptive, not pre-registered:* S_lin is not log-shaped; it grows roughly as
+N_ℓ^0.7 between the rung means (factor 4.1 over a factor 7.9 in N_ℓ). That is between the log
+law and the volume law.
+
+**Implication for Phase 5 (no choice made here).** In this geometry, the SXY linear truncation
+at δ = 0.1, applied to both diamonds, does not reproduce the 1+1 D log law. The SY cut at c ≥ 1
+does. SXY tuned δ in de Sitter "for compatibility with the area law", and no δ was tuned here.
+Before Phase 5 could rely on the linear truncation, its δ-dependence would need its own
+pre-registered test. Truncation choice is **not** harmless for the SSEE: the factor ≈ 3.8 in
+kept outer modes at N ≈ 4100 changes the entropy's scaling, not just its constant.
+
+### CONTROL — no truncation: **VOLUME LAW REPRODUCED**
+
+80 realisations, N_ℓ = 107–546 (N_L = 512–2048, first 16 per rung):
+
+- **S = αN_ℓ + β:** α = **0.312 ± 0.003** (93σ), β = −2.60. RSS 1399, against 8597 for the log
+  form.
+- **SY at ℓ/L = ½:** α = 0.32, β = −6.64. α agrees to 2.5%; β differs. SY's N_ℓ extends to
+  ≈ 2000, and β is an extrapolation to N_ℓ = 0.
+
+The machinery reproduces the known pre-truncation failure as well as the post-truncation success.
+
+### Honest line
+
+The Sorkin–Yazdi double truncation reproduces their coefficient, a = 0.336 ± 0.028 against
+0.346 ± 0.028 and 1/3, and the untruncated control reproduces their volume law (α = 0.312
+against 0.32). But the pre-registered plateau test fails. The coefficient is stable only for cuts
+at or tighter than √N/4π, and it runs to 0.63 when the cut is loosened by a factor 2. Combined
+with the wide target band, the PASS is consistency with SY, not strong evidence for the 1/3 law.
+The SXY linear truncation at δ = 0.1 gives non-logarithmic growth. That makes truncation choice
+consequential for the SSEE, a question this gate leaves to its own test before Phase 5.
+
+### Data availability
+
+Every file for this entry is under the ~20 MB rule and is committed to git. No file needed
+`.gitignore` or a Release asset; per-realisation checkpoints (`data/*.partial.npz`) are
+ignored and were deleted at the end of the run. All files are regenerable from the seeds
+recorded above.
+
+| File | Size (bytes) | SHA-256 |
+|---|---|---|
+| data/exp07_gate3_ssee.npz | 27126 | 3A1B719156144C76D6B251287D9E92B5FA2869A08720662E2759B35B9308B781 |
+| figures/exp07_gate3_ssee.png | 221106 | 64C39FE53BBF649ED7F17827D7C1E82A0BA46E93FBFA3465DED7E94224E3AB54 |
