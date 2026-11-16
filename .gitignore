@@ -9,3 +9,4 @@ venv/
 .vscode/
 build/
 data/exp06_gate2b_N*.npz
+data/*.partial.npz

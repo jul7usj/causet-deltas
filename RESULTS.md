@@ -1844,3 +1844,112 @@ by SHA-256. All four are regenerable from the seeds recorded above.
 | data/exp06_gate2b_N1024.npz | 10119659 | 2EC91EE9B68FF79FD2D514E83822A91A2B422D6F36351A0890A11DA378C83511 |
 | data/exp06_gate2b_N2048.npz | 18715323 | BC7CDA8A30FEFE0FA32D9DB2D93A9C7CAA56A7F33FB91CBFADED615F27CE12C7 |
 | data/exp06_gate2b_N4096.npz | 27669342 | 6E046F6389267D0793340CBD62E4FD79388E877DEE8953841E1DCAEE0A024AE9 |
+
+---
+
+## 2026-11-16 — Phase 3a GATE 3: SSEE of nested 1+1 D diamonds — PRE-REGISTRATION (committed and pushed before any data were generated)
+
+- **Branch:** `phase3-sj`
+- **Experiment:** `experiments/exp07_ssee_1p1d.py` (design and criteria repeated in its docstring)
+- **New library code:** `src/causet/ssee.py`. Tests: `tests/test_ssee.py`, 11 structural tests,
+  passing before any gate data.
+- **Source (re-read in full LaTeX, 2026-11-16):** Sorkin–Yazdi (SY) 1611.10281. Equations are
+  cited by `\label`.
+
+### What the paper specifies (re-verified)
+
+- **SSEE**, SY eq. (gee): `W v = iλ Δ v`, `Δ v ≠ 0`, with W and Δ restricted to the region and
+  "v … in the image of Δ"; SY eq. (s4): `S = Σ_λ λ ln|λ|`. The λ are the eigenvalues of
+  −iΔ⁻¹W on that image and come in pairs (λ, 1 − λ) (SY §3).
+- **Double truncation** (SY §3, text at Fig. "trunc"). Truncate both Δ and W in the larger
+  diamond at λ̃_min ~ √N_L/4π. Restrict both to the smaller diamond (W^R, Δ^R). Truncate again on
+  the spectrum of Δ^R at λ̃_min ~ √N_ℓ/4π, projecting the truncated modes out of W as well.
+- **Fit and target** (ℓ/L = ½): `S = a ln(x) + b` with x = √N_ℓ/4π gives
+  **a = 0.346 ± 0.028**, b = 1.883 ± 0.035, "consistent with the continuum value of a = 1/3".
+  The previously recorded value is confirmed.
+- **Untruncated** (SY Fig. "sn04"): `S = a N_ℓ + b` with a = 0.32, b = −6.64 at ℓ/L = ½,
+  a spacetime-volume law.
+- **SY's ranges, read from their figures:** truncated x ≈ 1.26–4.9 (N_ℓ ≈ 250–3800, N_L up to
+  ≈ 15 000), roughly 20 values of N with about 10–20 realisations each; untruncated N_ℓ ≈ 130–2000.
+  The paper does not state the realisation count or how ± 0.028 was obtained.
+
+### Method — the generalised eigenproblem on the support (`ssee.py`)
+
+- **Projection onto the support, no singular inverse.** Let U be orthonormal eigenvectors of the
+  restricted iΔ with |σ| ≥ cut (the numerical zero for the untruncated case), D = diag(σ). Then
+  eq. (gee) on the support is `W′x = λDx` with `W′ = U†WU`; projecting W onto the same support is
+  SY's "projected out from W and Δ". The λ are the eigenvalues of `J A`, where
+  `A = |D|^{−1/2} W′ |D|^{−1/2}` and `J = sign D`. No singular matrix is inverted, since |σ| ≥ cut
+  > 0. The largest |Im λ| is recorded as a diagnostic.
+- **Inner spectrum after the first truncation.** The restricted iΔ is exactly V D V† (V = inner
+  rows of the kept outer modes and their conjugate partners). Its non-zero spectrum comes exactly
+  from QR(V), so round-off cannot blur exact zeros. Round-off zeros are dropped at the
+  numerical-rank threshold.
+- **Structural tests (all pass, 11).**
+  - Known answer on a *singular* iΔ: two thermal mode pairs (n = 0.3, 2.5) plus a 3-dimensional
+    kernel carrying a W component. The solver gives λ = {1 + n, −n} and
+    S = Σ[(1 + n) ln(1 + n) − n ln n] to 1e-12, ignoring the kernel.
+  - **Purity:** the SSEE of the whole causet is 0. Untruncated, |S| < 1e-8 and λ ∈ {0, 1};
+    double-truncated with inner = everything, |S| < 1e-9. Checked on two sprinkled causets
+    (N ≈ 300).
+  - The low-rank inner spectrum equals a full eigensolve of the restricted truncated iΔ.
+  - SY's (λ, 1 − λ) pairing holds on a nested truncated case (1e-8), with S > 0 and
+    |Im λ| < 1e-8.
+
+### Design
+
+- Outer diamond τ = 1. The inner diamond is concentric, |u/L|, |v/L| ≤ ½, so **ℓ/L = ½** as in
+  the paper. Seeds `20261116 + 100000·i + k`.
+- **Ladder N_L(nominal) = 512, 724, 1024, 1448, 2048, 2896, 4096; R = 96, 64, 48, 40, 32, 24, 16.**
+  The **PRIMARY fit uses N_L ≥ 1024** (x ≈ 1.27–2.55), the lower part of SY's x range. Rungs
+  512 and 724 (x ≈ 0.9–1.07) lie below SY's range; they are measured and reported (an all-rung
+  fit), but they do not decide. **Our ln-x lever arm is ≈ 0.69, half of SY's (≈ 1.36)**: SY went
+  to N_L ≈ 15 000, which is not affordable in this budget.
+- **One outer solve per realisation:** positive eigenpairs for the top 30% of ranks (scipy `eigh`,
+  driver `evr`); negative partners are the conjugates. Every variant derives from this solve.
+  g1lin found n_lin/N ≤ 0.132, so the 30% cap should not bind; any realisation where it would is
+  flagged.
+- Per realisation, from the same outer solve:
+  - **SY cut with prefactor c**: both cuts are c·√N/4π, with N the realised N_L and N_ℓ;
+    c ∈ {0.5, 0.71, 1, 1.41, 2}.
+  - **SXY linear truncation**: `sj.linear_truncation_rank` exactly as fixed for the Gate 2
+    follow-up (δ = 0.1, 10 bins/decade, PCHIP, plateau −1, pair 1→2 excluded, last-rank rule),
+    applied to the outer positive spectrum (top 30% of ranks) for the first cut and to the inner
+    non-zero positive spectrum of Δ^R for the second. The knee rank becomes a magnitude cut at
+    that rank's eigenvalue.
+  - **CONTROL, no truncation**: full eigh; only numerical zeros excluded. Run on the first 16
+    realisations of each rung with N_L ≤ 2048 (N_ℓ ≈ 128–512).
+- **Fit:** OLS of per-realisation S on ln x_k, with x_k = √N_ℓ,k/4π. SE = max(OLS SE, bootstrap
+  SE), resampling realisations within rungs (2000 resamples, seed 77).
+- **Measured cost** (one throwaway seed per rung, outside the run's range; times only, no S
+  inspected): 74 s per realisation at N_L = 4096; 29.5 s at 2048 (control included); about 4 s at
+  1024 under the profiler. One unprofiled 1024 solve took 14.7 s, which was machine-load
+  variance. **Estimate for the full run ≈ 43 min, ≈ 53 min with a 25% margin, under the 60-min
+  cap; no reduction made.** If the run exceeds 60 min it continues to completion, checkpointed per
+  realisation, and the overrun is reported.
+
+### Criteria (fixed now)
+
+1. **PRIMARY — published double truncation (c = 1), N_L ≥ 1024.**
+   - **PASS** iff |a − 0.346| ≤ 2·√(SE_a² + 0.028²): consistency within the combined uncertainty
+     at 2σ. b against 1.883 ± 0.035 is reported, not graded.
+   - Comparison with the continuum 1/3 is reported as z = (a − 1/3)/SE_a.
+2. **PREFACTOR SWEEP**, c ∈ {0.5, 0.71, 1, 1.41, 2} on both cuts.
+   - **PLATEAU** iff |a(0.71) − a(1)| < SE(a(1)) and |a(1.41) − a(1)| < SE(a(1)), i.e. a varies
+     by less than its own SE over at least a factor 2 in c around 1. The maximal contiguous run is
+     reported.
+   - **NO PLATEAU** otherwise. Then it will be stated plainly that a gate whose outcome can be
+     dialled by the cut is weak evidence, whether or not the target is hit.
+3. **SECONDARY — linear truncation.** a_lin is compared with a(c = 1) by paired bootstrap (same
+   realisations).
+   - **SAME** iff |a_lin − a_SY| ≤ 2 SE_diff: the truncation choice is harmless for the SSEE.
+   - **DIFFERENT** otherwise: report which (if either) is consistent with 1/3 and with
+     0.346 ± 0.028 (2σ each), and what that implies for Phase 5. **No truncation is chosen for
+     Phase 5 in this gate.**
+4. **CONTROL — no truncation.** **VOLUME LAW REPRODUCED** iff the slope α of S = αN_ℓ + β is
+   ≥ 5σ above zero *and* the linear fit has a smaller residual sum of squares than S = a ln N_ℓ + b.
+   α against SY's 0.32 is reported, not graded: SY's N_ℓ range extends 4× further.
+
+**Data:** a single compressed file `data/exp07_gate3_ssee.npz` with per-realisation scalars only.
+Expected size is well under 1 MB. If any file exceeds ~20 MB it will be added to `.gitignore`
+and recorded by size and SHA-256 before any commit. `data/*.partial.npz` checkpoints are ignored.
